@@ -1,0 +1,4 @@
+MongoDB disconnected, using in-memory fallback
+MongoDB connection error: connect ECONNREFUSED ::1:27017, connect ECONNREFUSED 127.0.0.1:27017
+Continuing with in-memory fallback store
+Falling back to provider image URL: Could not generate the image preview. Please try a shorter prompt or try again.

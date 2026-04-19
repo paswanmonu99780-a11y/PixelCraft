@@ -1,0 +1,10 @@
+Image preview proxy error: Error: Image provider is busy right now. Please try again in a few seconds.
+    at fetchImageBuffer (c:\Users\manis\OneDrive\Desktop\image-generator\backend\src\utils\imageGenerator.js:90:26)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async exports.previewImage (c:\Users\manis\OneDrive\Desktop\image-generator\backend\src\controllers\imageController.js:89:37) {
+  status: 429
+}
+Falling back to direct image source for preview
+MongoDB disconnected, using in-memory fallback
+MongoDB connection error: connect ECONNREFUSED ::1:27017, connect ECONNREFUSED 127.0.0.1:27017
+Continuing with in-memory fallback store

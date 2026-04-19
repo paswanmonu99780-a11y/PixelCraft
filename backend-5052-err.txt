@@ -1,0 +1,7 @@
+MongoDB disconnected, using in-memory fallback
+MongoDB connection error: connect ECONNREFUSED ::1:27017, connect ECONNREFUSED 127.0.0.1:27017
+Continuing with in-memory fallback store
+Image generation error: Error: Could not generate the image preview. Please try a shorter prompt or try again.
+    at fetchImageAsDataUrl (c:\Users\manis\OneDrive\Desktop\image-generator\backend\src\utils\imageGenerator.js:86:11)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async exports.generateImage (c:\Users\manis\OneDrive\Desktop\image-generator\backend\src\controllers\imageController.js:25:22)

@@ -1,0 +1,2 @@
+Server running on port 5052
+Running with in-memory data store

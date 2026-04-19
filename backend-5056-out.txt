@@ -1,0 +1,2 @@
+Server running on port 5056
+Running with in-memory data store
