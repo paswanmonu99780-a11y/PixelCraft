@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { apiUrl, getJson } from '../utils/api';
+import { apiUrl, getJson, isDemoMode } from '../utils/api';
 import {
   ASSISTANT_ACTION_EVENT_NAME,
   clearPendingAssistantAction,
@@ -160,6 +160,10 @@ const getGenerateButtonLabel = (mode, loading) => {
 };
 
 const ImageGenerator = () => {
+  const demoMode = isDemoMode();
+  const availableModes = demoMode
+    ? GENERATION_MODES.filter((modeOption) => modeOption.value === 'text-to-image')
+    : GENERATION_MODES;
   const [mode, setMode] = useState('text-to-image');
   const [prompt, setPrompt] = useState('');
   const [ratio, setRatio] = useState(() => getStoredSetting('ratio', '1:1', RATIO_OPTIONS));
@@ -204,6 +208,12 @@ const ImageGenerator = () => {
     setPreviewRetryCount(0);
     setImgStatus(result?.assetType === 'image' ? 'loading' : 'idle');
   }, [result?.id, result?.assetType]);
+
+  useEffect(() => {
+    if (demoMode && mode !== 'text-to-image') {
+      setMode('text-to-image');
+    }
+  }, [demoMode, mode]);
 
   useEffect(() => {
     setError('');
@@ -610,8 +620,8 @@ const ImageGenerator = () => {
           </div>
         </div>
 
-        <div className="mode-selector" aria-label="Generation mode">
-          {GENERATION_MODES.map((modeOption) => (
+          <div className="mode-selector" aria-label="Generation mode">
+          {availableModes.map((modeOption) => (
             <button
               key={modeOption.value}
               type="button"
@@ -659,8 +669,20 @@ const ImageGenerator = () => {
             </div>
           </div>
 
+        {demoMode && (
+          <div className="video-status-banner is-warning">
+            <strong>Free Demo Mode</strong>
+            <span>
+              Is public free deploy me image generation, login, profile, history, aur browser-local community demo available hai.
+              Video tools aur live backend features disabled hain.
+            </span>
+          </div>
+        )}
+
           <p className="input-helper">
-            {isTextToImageMode
+            {demoMode
+              ? 'Image generation abhi free demo mode me direct public provider ke saath chal rahi hai. Aapka account aur history isi browser me save honge.'
+              : isTextToImageMode
               ? 'Text to Image is ready to use now.'
               : 'Video modes use the backend video inference configuration. For the best chance of success, set backend/.env with HUGGING_FACE_VIDEO_API_KEY or PIAPI_API_KEY. The backend now auto-falls back between supported Wan video providers.'}
           </p>

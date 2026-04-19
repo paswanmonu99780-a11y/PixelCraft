@@ -9,9 +9,11 @@ import Dashboard from './pages/Dashboard';
 import Explore from './pages/Explore';
 import PublicProfile from './pages/PublicProfile';
 import AiHelpperWidget from './components/AiHelpperWidget';
+import { isDemoMode } from './utils/api';
 import './styles/App.css';
 
 const routerBasename = process.env.PUBLIC_URL || '/';
+const demoMode = isDemoMode();
 
 const ProtectedRoute = ({ children }) => {
   const { token, loading } = useAuth();
@@ -43,7 +45,7 @@ function App() {
             }
           />
         </Routes>
-        <AiHelpperWidget />
+        {!demoMode && <AiHelpperWidget />}
       </AuthProvider>
     </BrowserRouter>
   );

@@ -12,6 +12,12 @@ import {
   Volume2,
   VolumeX,
   X,
+  Maximize,
+  Minimize,
+  ZoomIn,
+  ZoomOut,
+  Phone,
+  User,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { dispatchAssistantAction } from '../utils/assistantActions';
@@ -519,6 +525,8 @@ const AiHelpperWidget = () => {
   const [micLevel, setMicLevel] = useState(0);
   const [speakerLevel, setSpeakerLevel] = useState(0);
   const [panelFrame, setPanelFrame] = useState(getStoredPanelFrame);
+  const [isMaximized, setIsMaximized] = useState(false);
+  const [isCallMode, setIsCallMode] = useState(false);
 
   const messagesEndRef = useRef(null);
   const messagesRef = useRef(initialMessages);
@@ -564,18 +572,18 @@ const AiHelpperWidget = () => {
     return 'calm';
   }, [isSending, isVoiceReplyLoading, liveState, micLevel, speakerLevel]);
 
-  const panelStyle = useMemo(() => {
-    const nextFrame = sanitizePanelFrame(panelFrame);
+   const panelStyle = useMemo(() => {
+     const nextFrame = sanitizePanelFrame(panelFrame);
 
-    return {
-      width: `${nextFrame.width}px`,
-      height: `${nextFrame.height}px`,
-      left: `${nextFrame.x}px`,
-      top: `${nextFrame.y}px`,
-      right: 'auto',
-      bottom: 'auto',
-    };
-  }, [panelFrame]);
+     return {
+       width: isMaximized ? '100vw' : `${nextFrame.width}px`,
+       height: isMaximized ? '100vh' : `${nextFrame.height}px`,
+       left: isMaximized ? 0 : `${nextFrame.x}px`,
+       top: isMaximized ? 0 : `${nextFrame.y}px`,
+       right: isMaximized ? 'auto' : 'auto',
+       bottom: isMaximized ? 'auto' : 'auto',
+     };
+   }, [panelFrame, isMaximized]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
@@ -1399,7 +1407,16 @@ const AiHelpperWidget = () => {
   };
 
   const startLiveTalk = async () => {
+    setIsCallMode(true);
+    
     if (liveState !== 'idle') {
+      return;
+    }
+
+    // Authentication check - if no token, redirect to login
+    if (!token) {
+      setPanelError('Please log in to use live call feature.');
+      navigate('/login');
       return;
     }
 
@@ -1445,9 +1462,103 @@ const AiHelpperWidget = () => {
 
       peerConnection.onconnectionstatechange = () => {
         if (peerConnection.connectionState === 'failed' || peerConnection.connectionState === 'disconnected') {
-          shutdownLiveSession();
+          shutdownLiveSession({ keepNote: false });
         }
       };
+
+      peerConnection.ontrack = (event) => {
+        const remoteStream = event.streams[0];
+        stopSpeakerMonitorRef.current?.();
+        stopSpeakerMonitorRef.current = monitorStreamLevel(remoteStream, setSpeakerLevel);
+
+        if (!liveAudioRef.current) {
+          liveAudioRef.current = new Audio();
+          liveAudioRef.current.autoplay = true;
+          liveAudioRef.current.playsInline = true;
+        }
+
+        liveAudioRef.current.srcObject = remoteStream;
+        liveAudioRef.current.play().catch(() => {});
+      };
+
+      micStream.getTracks().forEach((track) => {
+        peerConnection.addTrack(track, micStream);
+      });
+
+      const dataChannel = peerConnection.createDataChannel('oai-events');
+      dataChannelRef.current = dataChannel;
+
+      dataChannel.onopen = () => {
+        setLiveState('active');
+        setLiveNote('Live talk active hai. Aap naturally baat kar sakte hain.');
+      };
+
+      dataChannel.onmessage = (event) => {
+        handleLiveEvent(event.data);
+      };
+
+      dataChannel.onclose = () => {
+        if (liveEngineRef.current === 'openai') {
+          shutdownLiveSession({ keepNote: false });
+        }
+      };
+
+      const offer = await peerConnection.createOffer();
+      await peerConnection.setLocalDescription(offer);
+
+      const response = await fetch(apiUrl('/api/assistant/live-session'), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/sdp',
+          'X-Page-Context': JSON.stringify(pageContext),
+          'X-Assistant-Client-Id': assistantClientId,
+          ...(token
+            ? {
+                Authorization: `Bearer ${token}`,
+              }
+            : {}),
+        },
+        body: offer.sdp,
+      });
+
+      const responseText = await response.text();
+
+      if (!response.ok) {
+        let message = 'Live talk start nahi ho saka';
+
+        try {
+          const parsedError = JSON.parse(responseText);
+          message = parsedError.error || message;
+        } catch (error) {
+          message = responseText || message;
+        }
+
+        throw new Error(message);
+      }
+
+      await peerConnection.setRemoteDescription({
+        type: 'answer',
+        sdp: responseText,
+      });
+    } catch (error) {
+      shutdownLiveSession({ keepNote: false });
+      const browserStarted = await startBrowserRecognition({
+        notice: 'Cloud live connect nahi hua, browser live mode start kar raha hoon...',
+      });
+
+      if (!browserStarted) {
+        setLiveNote('Live talk unavailable hai.');
+        setPanelError(error.message || 'Live talk start nahi ho saka');
+        return;
+      }
+
+      setPanelError(
+        error.message
+          ? `${error.message} Browser live mode use ho raha hai.`
+          : 'Cloud live unavailable tha, isliye browser live mode use ho raha hai.'
+      );
+    }
+  };
 
       peerConnection.ontrack = (event) => {
         const remoteStream = event.streams[0];
@@ -1547,6 +1658,7 @@ const AiHelpperWidget = () => {
     stopTextReplyAudio();
     stopBrowserLiveTalk();
     shutdownLiveSession();
+    setIsCallMode(false);
   };
 
   const handleClose = () => {
@@ -1591,13 +1703,13 @@ const AiHelpperWidget = () => {
               aria-label="Close AI Helpper overlay"
             />
           )}
-          <aside
-            className="ai-helpper-panel"
-            aria-label="AI Helpper panel"
-            role="dialog"
-            aria-modal={!allowBackgroundInteraction}
-            style={panelStyle}
-          >
+           <aside
+             className={`ai-helpper-panel ${isMaximized ? 'maximized' : ''}`}
+             aria-label="AI Helpper panel"
+             role="dialog"
+             aria-modal={!allowBackgroundInteraction}
+             style={panelStyle}
+           >
             <header className="ai-helpper-header">
               <div className="ai-helpper-header-top">
                 <div className="ai-helpper-badge">
@@ -1605,42 +1717,54 @@ const AiHelpperWidget = () => {
                   AI Helpper
                 </div>
                 <div className="ai-helpper-header-actions">
-                  <section className="ai-helpper-mode-row ai-helpper-mode-row--compact">
-                    <button
-                      type="button"
-                      className={`mode-chip ${allowBackgroundInteraction ? 'active' : ''}`}
-                      onClick={() => setAllowBackgroundInteraction(true)}
-                    >
-                      Background use on
-                    </button>
-                    <button
-                      type="button"
-                      className={`mode-chip ${!allowBackgroundInteraction ? 'active' : ''}`}
-                      onClick={() => setAllowBackgroundInteraction(false)}
-                    >
-                      Background lock on
-                    </button>
-                  </section>
+                    <section className="ai-helpper-mode-row ai-helpper-mode-row--compact">
+                        <button
+                            type="button"
+                            className={`mode-chip ${allowBackgroundInteraction ? 'active' : ''}`}
+                            onClick={() => setAllowBackgroundInteraction(true)}
+                        >
+                            Background use on
+                        </button>
+                        <button
+                            type="button"
+                            className={`mode-chip ${!allowBackgroundInteraction ? 'active' : ''}`}
+                            onClick={() => setAllowBackgroundInteraction(false)}
+                        >
+                            Background lock on
+                        </button>
+                    </section>
 
-                  <button
-                    type="button"
-                    className="ai-helpper-ghost-action"
-                    onClick={handleClearHistory}
-                    aria-label="Clear saved chat history"
-                    title="Clear saved chat history"
-                  >
-                    <Trash2 size={15} />
-                    Clear history
-                  </button>
+                    <button
+                        type="button"
+                        className="ai-helpper-ghost-action"
+                        onClick={() => setIsMaximized(!isMaximized)}
+                        aria-label={isMaximized ? 'Restore AI Helpper' : 'Maximize AI Helpper'}
+                        title={isMaximized ? 'Restore AI Helpper' : 'Maximize AI Helpper'}
+                    >
+                        {isMaximized ? <Minimize size={18} /> : <Maximize size={18} />}
+                    </button>
 
-                  <button
-                    type="button"
-                    className="ai-helpper-close"
-                    onClick={handleClose}
-                    aria-label="Close AI Helpper"
-                  >
-                    <X size={18} />
-                  </button>
+
+
+                    <button
+                        type="button"
+                        className="ai-helpper-ghost-action"
+                        onClick={handleClearHistory}
+                        aria-label="Clear saved chat history"
+                        title="Clear saved chat history"
+                    >
+                        <Trash2 size={15} />
+                        Clear history
+                    </button>
+
+                    <button
+                        type="button"
+                        className="ai-helpper-close"
+                        onClick={handleClose}
+                        aria-label="Close AI Helpper"
+                    >
+                        <X size={18} />
+                    </button>
                 </div>
               </div>
 
@@ -1657,86 +1781,8 @@ const AiHelpperWidget = () => {
               </div>
             </header>
 
-            <section className="ai-helpper-stage">
-              <div className={`helpper-portrait ${avatarMode}`}>
-                <span className="portrait-aura portrait-aura-left"></span>
-                <span className="portrait-aura portrait-aura-right"></span>
-                <div className="portrait-code-rain" aria-hidden="true">
-                  <span>0101</span>
-                  <span>/root</span>
-                  <span>matrix</span>
-                </div>
-                <div className="portrait-hood"></div>
-                <div className="portrait-head">
-                  <div className="portrait-hair"></div>
-                  <div className="portrait-face">
-                    <div className="portrait-visor"></div>
-                    <div className="portrait-brow portrait-brow-left"></div>
-                    <div className="portrait-brow portrait-brow-right"></div>
-                    <div className="portrait-eye portrait-eye-left"></div>
-                    <div className="portrait-eye portrait-eye-right"></div>
-                    <div className="portrait-nose"></div>
-                    <div className="portrait-mouth"></div>
-                  </div>
-                </div>
-                <div className="portrait-neck"></div>
-                <div className="portrait-shoulders"></div>
-                <div className="portrait-terminal-glow"></div>
-              </div>
 
-              <div className="ai-helpper-stage-copy">
-                <div className="stage-row">
-                  <strong>
-                    {liveState === 'idle'
-                      ? 'AI ready'
-                      : liveEngine === 'browser'
-                        ? 'Browser live'
-                        : 'Cloud live'}
-                  </strong>
-                  <span className={`stage-pill is-${avatarMode}`}>{avatarMode}</span>
-                </div>
-                <div className="ai-helpper-inline-controls">
-                  <button
-                    type="button"
-                    className={`control-button control-button--compact primary ${liveState !== 'idle' ? 'danger' : ''}`}
-                    onClick={liveState === 'idle' ? startLiveTalk : stopLiveTalk}
-                  >
-                    {liveState === 'idle' ? <Mic size={14} /> : <MicOff size={14} />}
-                    {liveState === 'idle' ? 'Start live talk' : 'Stop live talk'}
-                  </button>
-
-                  <button
-                    type="button"
-                    className={`control-button control-button--compact ${voiceRepliesEnabled ? 'active' : ''}`}
-                    onClick={() => setVoiceRepliesEnabled((current) => !current)}
-                    disabled={liveState !== 'idle'}
-                  >
-                    {voiceRepliesEnabled ? <Volume2 size={14} /> : <VolumeX size={14} />}
-                    Voice replies
-                  </button>
-                </div>
-                <p>{liveNote}</p>
-                <small>
-                  {`Multilingual | World answers | Saved chat | ${
-                    liveEngine === 'browser'
-                      ? 'Browser speech voice'
-                      : assistantStatus?.voiceDisclosure || 'AI-generated voice'
-                  }`}
-                </small>
-              </div>
-
-              <div className="audio-meter" aria-hidden="true">
-                {[0, 1, 2, 3, 4].map((bar) => {
-                  const activeHeight = 8 + Math.max(micLevel, speakerLevel) * 22 + bar * 2;
-                  return (
-                    <span
-                      key={bar}
-                      style={{ height: `${activeHeight}px` }}
-                    ></span>
-                  );
-                })}
-              </div>
-            </section>
+            
 
             <div className="ai-helpper-messages">
               {messages.map((message) => (
@@ -1791,43 +1837,54 @@ const AiHelpperWidget = () => {
 
             {panelError && <div className="ai-helpper-error">{panelError}</div>}
 
-            <form className="ai-helpper-composer" onSubmit={handleSubmit}>
-              <textarea
-                value={input}
-                onChange={(event) => setInput(event.target.value)}
-                placeholder="Kuch bhi poochiye, ya command dijiye: 'explore kholo' ya 'cyber city image generate karo'"
-                rows={2}
-                disabled={isSending}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter' && !event.shiftKey) {
-                    event.preventDefault();
-                    handleSubmit(event);
-                  }
-                }}
-              />
+             <form className="ai-helpper-composer" onSubmit={handleSubmit}>
+               <textarea
+                 value={input}
+                 onChange={(event) => setInput(event.target.value)}
+                 placeholder="Kuch bhi poochiye, ya command dijiye: 'explore kholo' ya 'cyber city image generate karo'"
+                 rows={2}
+                 disabled={isSending}
+                 onKeyDown={(event) => {
+                   if (event.key === 'Enter' && !event.shiftKey) {
+                     event.preventDefault();
+                     handleSubmit(event);
+                   }
+                 }}
+               />
 
-              <div className="composer-buttons">
-                <button
-                  type="button"
-                  className="composer-voice"
-                  disabled={!latestAssistantReplyRef.current || isVoiceReplyLoading || liveState !== 'idle'}
-                  onClick={() => playAssistantVoice(latestAssistantReplyRef.current)}
-                  aria-label="Listen to AI response"
-                  title="AI ka jawab suno (Listen to AI response)"
-                >
-                  {isVoiceReplyLoading ? <Loader2 size={16} className="spin" /> : <Volume2 size={16} />}
-                </button>
+               <div className="composer-buttons">
+                 <button
+                   type="button"
+                   className="composer-voice"
+                   disabled={!latestAssistantReplyRef.current || isVoiceReplyLoading || liveState !== 'idle'}
+                   onClick={() => playAssistantVoice(latestAssistantReplyRef.current)}
+                   aria-label="Listen to AI response"
+                   title="AI ka jawab suno (Listen to AI response)"
+                 >
+                   {isVoiceReplyLoading ? <Loader2 size={16} className="spin" /> : <Volume2 size={16} />}
+                 </button>
 
-                <button
-                  type="submit"
-                  className="composer-send"
-                  disabled={!input.trim() || isSending}
-                  aria-label="Send message"
-                >
-                  <Send size={16} />
-                </button>
-              </div>
-            </form>
+                  <button
+                    type="button"
+                    className="composer-call"
+                    onClick={startLiveTalk}
+                    disabled={!token}
+                    aria-label="Start video call"
+                    title={!token ? "Login required for live call" : "Live video call"}
+                  >
+                    <Phone size={16} />
+                  </button>
+
+                 <button
+                   type="submit"
+                   className="composer-send"
+                   disabled={!input.trim() || isSending}
+                   aria-label="Send message"
+                 >
+                   <Send size={16} />
+                 </button>
+               </div>
+             </form>
 
             <div
               className="ai-helpper-resize-handle"
@@ -1839,11 +1896,72 @@ const AiHelpperWidget = () => {
               <span></span>
               <span></span>
             </div>
-          </aside>
-        </>
-      )}
-    </>
-  );
+           </aside>
+
+           {isCallMode && (
+             <div className="ai-call-overlay">
+               <div className="ai-call-container">
+                 <div className="ai-call-header">
+                   <h3>Human Assistant Call</h3>
+                   <button 
+                     type="button" 
+                     className="ai-call-close" 
+                     onClick={() => setIsCallMode(false)}
+                   >
+                     <X size={24} />
+                   </button>
+                 </div>
+                 
+                 <div className="ai-call-avatar">
+                   <div className="ai-call-person">
+                     <div className="ai-call-face">
+                       <div className="ai-call-eyes">
+                         <div className="ai-call-eye"></div>
+                         <div className="ai-call-eye"></div>
+                       </div>
+                       <div className="ai-call-mouth"></div>
+                     </div>
+                   </div>
+                   <div className="ai-call-status">
+                     <div className="ai-call-indicator live"></div>
+                     <span>Live Call Active</span>
+                   </div>
+                 </div>
+                 
+                 <div className="ai-call-controls">
+                   <button 
+                     type="button" 
+                     className="ai-call-button mic"
+                     onClick={() => {}}
+                   >
+                     <Mic size={20} />
+                   </button>
+                   <button 
+                     type="button" 
+                     className="ai-call-button end"
+                     onClick={() => setIsCallMode(false)}
+                   >
+                     <X size={20} />
+                   </button>
+                   <button 
+                     type="button" 
+                     className="ai-call-button speaker"
+                     onClick={() => setVoiceRepliesEnabled(!voiceRepliesEnabled)}
+                   >
+                     {voiceRepliesEnabled ? <Volume2 size={20} /> : <VolumeX size={20} />}
+                   </button>
+                 </div>
+                 
+                 <div className="ai-call-info">
+                   <p>Speak naturally. Your AI assistant will listen and respond verbally.</p>
+                 </div>
+               </div>
+             </div>
+           )}
+         </>
+       )}
+     </>
+   );
 };
 
 export default AiHelpperWidget;

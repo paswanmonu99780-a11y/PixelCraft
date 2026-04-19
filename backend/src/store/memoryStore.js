@@ -72,6 +72,24 @@ const saveStore = () => {
 
 loadStore();
 
+// Create demo user if no users exist
+const createDemoUser = async () => {
+  if (state.users.length === 0) {
+    try {
+      await createUser({
+        username: 'demo',
+        email: 'demo@example.com',
+        password: 'demo123'
+      });
+      console.log('Demo user created: demo@example.com / demo123');
+    } catch (error) {
+      console.error('Failed to create demo user:', error.message);
+    }
+  }
+};
+
+createDemoUser();
+
 const sanitizeUser = (user) => {
   if (!user) return null;
   return serializeUser(user);
