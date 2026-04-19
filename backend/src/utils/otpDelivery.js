@@ -92,6 +92,8 @@ const buildUnconfiguredDeliveryError = (contactType) => {
 const sendVerificationCode = async ({ contact, code, purpose }) => {
   const content = getVerificationContent({ code, purpose });
 
+  const isDevMode = process.env.NODE_ENV !== 'production';
+
   if (contact.type === 'email') {
     if (isEmailDeliveryConfigured()) {
       try {
@@ -111,7 +113,7 @@ const sendVerificationCode = async ({ contact, code, purpose }) => {
       }
     }
 
-    if (process.env.NODE_ENV === 'production') {
+    if (!isDevMode) {
       throw buildUnconfiguredDeliveryError(contact.type);
     }
   }
@@ -133,7 +135,7 @@ const sendVerificationCode = async ({ contact, code, purpose }) => {
       }
     }
 
-    if (process.env.NODE_ENV === 'production') {
+    if (!isDevMode) {
       throw buildUnconfiguredDeliveryError(contact.type);
     }
   }
