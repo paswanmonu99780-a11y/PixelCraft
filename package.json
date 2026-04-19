@@ -1,0 +1,16 @@
+{
+  "private": true,
+  "scripts": {
+    "postinstall": "npm install --prefix backend && npm install --prefix frontend",
+    "build": "npm run build --prefix frontend",
+    "start": "node backend/server.js",
+    "start:backend": "node backend/server.js",
+    "start:frontend": "npm start --prefix frontend"
+  },
+  "dependencies": {
+    "canvas": "^3.2.3"
+  },
+  "devDependencies": {
+    "gh-pages": "^6.3.0"
+  }
+}

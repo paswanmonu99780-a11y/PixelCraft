@@ -1,0 +1,28 @@
+services:
+  - type: web
+    name: pixelcraft-app
+    env: node
+    plan: free
+    autoDeploy: true
+    healthCheckPath: /api/health
+    buildCommand: npm install && PUBLIC_URL=/ npm run build --prefix frontend
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: FRONTEND_BASE_PATH
+        value: /
+      - key: JWT_SECRET
+        generateValue: true
+      - key: MONGODB_URI
+        sync: false
+      - key: HUGGING_FACE_API_KEY
+        sync: false
+      - key: HUGGING_FACE_VIDEO_API_KEY
+        sync: false
+      - key: PIAPI_API_KEY
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
