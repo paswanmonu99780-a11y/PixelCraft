@@ -3,8 +3,17 @@ const validator = require('validator');
 
 const PHONE_REGEX = /^\d{10,15}$/;
 
+const getJwtSecret = () => {
+  const secret = process.env.JWT_SECRET;
+  if (!secret) {
+    console.warn('JWT_SECRET not set - using insecure fallback. Set JWT_SECRET in environment for production.');
+    return 'fallback_secret_change_me_in_production';
+  }
+  return secret;
+};
+
 const generateToken = (userId) => {
-  return jwt.sign({ userId }, process.env.JWT_SECRET, { expiresIn: '7d' });
+  return jwt.sign({ userId }, getJwtSecret(), { expiresIn: '7d' });
 };
 
 const normalizeEmail = (email = '') => String(email || '').trim().toLowerCase();

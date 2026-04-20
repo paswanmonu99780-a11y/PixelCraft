@@ -27,25 +27,35 @@ function App() {
   return (
     <BrowserRouter basename={routerBasename}>
       <AuthProvider>
-        <Routes>
-          <Route path="/" element={<Landing />} />
-          <Route path="/explore" element={<Explore />} />
-          <Route path="/users/:userId" element={<PublicProfile />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/signup" element={<Signup />} />
-          <Route path="/forgot-password" element={<ForgotPassword />} />
-          <Route
-            path="/dashboard"
-            element={
-              <ProtectedRoute>
-                <Dashboard />
-              </ProtectedRoute>
-            }
-          />
-        </Routes>
-        <AiAssistant />
+        <AppContent />
       </AuthProvider>
     </BrowserRouter>
+  );
+}
+
+function AppContent() {
+  const { token } = useAuth();
+
+  return (
+    <>
+      <Routes>
+        <Route path="/" element={<Landing />} />
+        <Route path="/explore" element={<Explore />} />
+        <Route path="/users/:userId" element={<PublicProfile />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/signup" element={<Signup />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route
+          path="/dashboard"
+          element={
+            <ProtectedRoute>
+              <Dashboard />
+            </ProtectedRoute>
+          }
+        />
+      </Routes>
+      {token && <AiAssistant />}
+    </>
   );
 }
 

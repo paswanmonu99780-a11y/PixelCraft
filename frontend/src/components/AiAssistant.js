@@ -37,8 +37,13 @@ const isClearAssistantInput = (value = '', { source = 'text' } = {}) => {
 
 const AiAssistant = () => {
   const { token } = useAuth();
-  const [isOpen, setIsOpen] = useState(true);
-  const [isMinimized, setIsMinimized] = useState(false);
+  const [isOpen, setIsOpen] = useState(() => {
+    return false;
+  });
+  const [isMinimized, setIsMinimized] = useState(() => {
+    const saved = localStorage.getItem('ai-assistant-minimized');
+    return saved !== null ? JSON.parse(saved) : false;
+  });
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
@@ -66,6 +71,14 @@ const AiAssistant = () => {
     recognitionRef.current?.stop();
     window.speechSynthesis?.cancel();
   }, []);
+
+  useEffect(() => {
+    localStorage.setItem('ai-assistant-open', JSON.stringify(isOpen));
+  }, [isOpen]);
+
+  useEffect(() => {
+    localStorage.setItem('ai-assistant-minimized', JSON.stringify(isMinimized));
+  }, [isMinimized]);
 
   const appendAssistantMessage = (content) => {
     setMessages(prev => [...prev, { id: `asst-${Date.now()}`, role: 'assistant', content }]);

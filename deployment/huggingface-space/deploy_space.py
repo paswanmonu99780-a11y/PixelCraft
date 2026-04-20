@@ -32,7 +32,6 @@ def copy_tree(src: Path, dst: Path) -> None:
         dst,
         ignore=shutil.ignore_patterns(
             "node_modules",
-            "build",
             ".env",
             ".git",
             "*.log",

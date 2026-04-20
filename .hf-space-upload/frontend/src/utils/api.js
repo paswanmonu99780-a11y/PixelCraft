@@ -5,10 +5,10 @@ const getDefaultBaseUrl = () => {
     return 'http://localhost:5000';
   }
 
-  const { hostname, origin } = window.location;
+  const { hostname } = window.location;
   const isLocalDevelopment = hostname === 'localhost' || hostname === '127.0.0.1';
 
-  return isLocalDevelopment ? 'http://localhost:5000' : origin;
+  return isLocalDevelopment ? 'http://localhost:5000' : window.location.origin;
 };
 
 const rawBaseUrl = trimTrailingSlash(process.env.REACT_APP_API_URL || getDefaultBaseUrl());

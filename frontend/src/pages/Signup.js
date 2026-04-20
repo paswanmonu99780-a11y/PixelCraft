@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { getJson } from '../utils/api';
-import heroArtwork from '../assets/media-studio-hero.png';
 import '../styles/Auth.css';
 
 const Signup = () => {
@@ -112,41 +111,10 @@ const Signup = () => {
   return (
     <div className="auth-container">
       <div className="auth-shell">
-        <section className="auth-showcase">
-          <div className="auth-showcase-copy">
-            <p className="auth-kicker">Join Nova Canvas</p>
-            <h1>Create your profile and start publishing better-looking work</h1>
-            <p className="auth-showcase-text">
-              Set up your creator account, unlock image and video workflows, and keep your identity ready for
-              the community feed from day one.
-            </p>
-          </div>
-
-          <div className="auth-showcase-art">
-            <img
-              src={heroArtwork}
-              alt="Illustration of the AI media creation workflow"
-              className="auth-hero-artwork"
-            />
-          </div>
-
-          <div className="auth-highlights">
-            <div className="auth-highlight-card">
-              <strong>Identity</strong>
-              <span>Creator profile, avatar, and public-facing presentation in one setup.</span>
-            </div>
-            <div className="auth-highlight-card">
-              <strong>Workflow</strong>
-              <span>Generate, regenerate, download, and publish without leaving your studio.</span>
-            </div>
-          </div>
-        </section>
-
         <div className="auth-card">
           <div className="auth-card-top">
             <p className="auth-card-kicker">Create account</p>
             <h2>Sign up</h2>
-            <p className="auth-subtitle">Email ya mobile number se account banao aur code verify karke start karo.</p>
           </div>
 
           {error && <div className="error-message">{error}</div>}
@@ -168,14 +136,14 @@ const Signup = () => {
             <div className="form-group">
               <label>Email or Mobile Number</label>
               <div className="auth-action-row">
-                <input
-                  type="text"
-                  name="identifier"
-                  value={formData.identifier}
-                  onChange={handleInputChange}
-                  required
-                  placeholder="your@email.com or +91 9876543210"
-                />
+                 <input
+                   type="text"
+                   name="identifier"
+                   value={formData.identifier}
+                   onChange={handleInputChange}
+                   required
+                   placeholder="Enter email or mobile number"
+                 />
                 <button
                   type="button"
                   className="secondary-auth-button"
@@ -184,12 +152,8 @@ const Signup = () => {
                 >
                   {sendingCode ? 'Sending...' : codeSent ? 'Resend Code' : 'Send Code'}
                 </button>
-              </div>
-              <p className="field-note">
-                SMS ke liye country code ke saath number likhiye, jaise +91 9876543210. Local development
-                mein delivery service configured na ho to code yahin screen par dikh jayega.
-              </p>
-            </div>
+               </div>
+             </div>
 
             {codeSent && (
               <div className="form-group">
@@ -208,29 +172,26 @@ const Signup = () => {
 
             <div className="form-group">
               <label>Referral Code (Optional)</label>
-              <input
-                type="text"
-                name="referralCode"
-                value={formData.referralCode}
-                onChange={handleInputChange}
-                placeholder="Invite code dalna ho to yahan likhiye"
-                maxLength={16}
-              />
-              <p className="field-note">
-                Agar kisi creator ne aapko invite kiya hai, to unka referral code yahan use kar sakte hain.
-              </p>
-            </div>
+               <input
+                 type="text"
+                 name="referralCode"
+                 value={formData.referralCode}
+                 onChange={handleInputChange}
+                 placeholder="Referral code (optional)"
+                 maxLength={16}
+               />
+             </div>
 
             <div className="form-group">
               <label>Password</label>
-              <input
-                type="password"
-                name="password"
-                value={formData.password}
-                onChange={handleInputChange}
-                required
-                placeholder="At least 8 characters"
-              />
+               <input
+                 type="password"
+                 name="password"
+                 value={formData.password}
+                 onChange={handleInputChange}
+                 required
+                 placeholder="Create a strong password"
+               />
               {formData.password && (
                 <div className="password-strength">
                   <div

@@ -143,6 +143,9 @@ export const AuthProvider = ({ children }) => {
     setToken(null);
     setUser(null);
     setLoading(false);
+    // Reset AI Assistant state
+    localStorage.removeItem('ai-assistant-open');
+    localStorage.removeItem('ai-assistant-minimized');
   };
 
   return (

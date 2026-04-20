@@ -92,8 +92,6 @@ const buildUnconfiguredDeliveryError = (contactType) => {
 const sendVerificationCode = async ({ contact, code, purpose }) => {
   const content = getVerificationContent({ code, purpose });
 
-  const isDevMode = process.env.NODE_ENV !== 'production';
-
   if (contact.type === 'email') {
     if (isEmailDeliveryConfigured()) {
       try {
@@ -108,13 +106,8 @@ const sendVerificationCode = async ({ contact, code, purpose }) => {
         if (error.status && !error.response) {
           throw error;
         }
-
         throwDeliveryError('Could not send verification code by email.', error);
       }
-    }
-
-    if (!isDevMode) {
-      throw buildUnconfiguredDeliveryError(contact.type);
     }
   }
 
@@ -130,16 +123,12 @@ const sendVerificationCode = async ({ contact, code, purpose }) => {
         if (error.status && !error.response) {
           throw error;
         }
-
         throwDeliveryError('Could not send verification code by SMS.', error);
       }
     }
-
-    if (!isDevMode) {
-      throw buildUnconfiguredDeliveryError(contact.type);
-    }
   }
 
+  // Debug/fallback: show code in console and return it to frontend
   console.info(`[OTP:${purpose}] ${contact.type} ${contact.value} -> ${code}`);
 
   return {
