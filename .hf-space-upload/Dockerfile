@@ -13,7 +13,7 @@ COPY frontend ./frontend
 
 RUN npm run build --prefix frontend
 
-ENV NODE_ENV=development
+ENV NODE_ENV=production
 ENV PORT=7860
 ENV FRONTEND_BASE_PATH=/
 ENV USE_MEMORY_DB=true

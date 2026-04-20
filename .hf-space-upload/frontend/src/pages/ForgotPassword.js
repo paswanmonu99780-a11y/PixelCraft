@@ -98,9 +98,8 @@ const ForgotPassword = () => {
 
   return (
     <div className="auth-container">
-      <div className="auth-card">
-        <h1>Forgot Password</h1>
-        <p className="auth-subtitle">Email ya mobile number par code paakar naya password set kijiye</p>
+       <div className="auth-card">
+         <h1>Forgot Password</h1>
 
         {error && <div className="error-message">{error}</div>}
         {successMessage && <div className="success-message">{successMessage}</div>}
@@ -109,14 +108,14 @@ const ForgotPassword = () => {
           <div className="form-group">
             <label>Email or Mobile Number</label>
             <div className="auth-action-row">
-              <input
-                type="text"
-                name="identifier"
-                value={formData.identifier}
-                onChange={handleInputChange}
-                required
-                placeholder="your@email.com or +91 9876543210"
-              />
+               <input
+                 type="text"
+                 name="identifier"
+                 value={formData.identifier}
+                 onChange={handleInputChange}
+                 required
+                 placeholder="Enter email or mobile number"
+               />
               <button
                 type="button"
                 className="secondary-auth-button"
@@ -125,12 +124,8 @@ const ForgotPassword = () => {
               >
                 {sendingCode ? 'Sending...' : codeSent ? 'Resend Code' : 'Send Code'}
               </button>
-            </div>
-            <p className="field-note">
-              SMS ke liye country code ke saath number likhiye, jaise +91 9876543210.
-              Agar delivery service configured nahi hai to dev code isi screen par show hoga.
-            </p>
-          </div>
+             </div>
+           </div>
 
           {codeSent && (
             <>
@@ -149,14 +144,14 @@ const ForgotPassword = () => {
 
               <div className="form-group">
                 <label>New Password</label>
-                <input
-                  type="password"
-                  name="password"
-                  value={formData.password}
-                  onChange={handleInputChange}
-                  required
-                  placeholder="At least 8 characters"
-                />
+                 <input
+                   type="password"
+                   name="password"
+                   value={formData.password}
+                   onChange={handleInputChange}
+                   required
+                   placeholder="Create a strong password"
+                 />
                 {formData.password && (
                   <div className="password-strength">
                     <div

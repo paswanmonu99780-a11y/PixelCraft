@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import heroArtwork from '../assets/media-studio-hero.png';
 import '../styles/Auth.css';
 
 const Login = () => {
@@ -46,36 +45,6 @@ const Login = () => {
   return (
     <div className="auth-container">
       <div className="auth-shell">
-        <section className="auth-showcase">
-          <div className="auth-showcase-copy">
-            <p className="auth-kicker">Creator access</p>
-            <h1>Jump back into your media studio</h1>
-            <p className="auth-showcase-text">
-              Continue generating images, building motion ideas, and publishing your strongest work with your
-              profile front and center.
-            </p>
-          </div>
-
-          <div className="auth-showcase-art">
-            <img
-              src={heroArtwork}
-              alt="Illustration of the AI media studio dashboard"
-              className="auth-hero-artwork"
-            />
-          </div>
-
-          <div className="auth-highlights">
-            <div className="auth-highlight-card">
-              <strong>Create</strong>
-              <span>Prompt into image and motion from one workspace.</span>
-            </div>
-            <div className="auth-highlight-card">
-              <strong>Publish</strong>
-              <span>Push polished visuals into Explore when they are ready.</span>
-            </div>
-          </div>
-        </section>
-
         <div className="auth-card">
           <div className="auth-card-top">
             <p className="auth-card-kicker">Welcome back</p>
@@ -88,15 +57,15 @@ const Login = () => {
           <form onSubmit={handleSubmit}>
             <div className="form-group">
               <label>Email or Mobile Number</label>
-              <input
-                type="text"
-                name="identifier"
-                value={formData.identifier}
-                onChange={handleInputChange}
-                required
-                placeholder="your@email.com or +91 9876543210"
-              />
-              <p className="field-note">Mobile number ko country code ke saath enter karna best rahega.</p>
+               <input
+                 type="text"
+                 name="identifier"
+                 value={formData.identifier}
+                 onChange={handleInputChange}
+                 required
+                 placeholder="Enter email or mobile number"
+               />
+
             </div>
 
             <div className="form-group">

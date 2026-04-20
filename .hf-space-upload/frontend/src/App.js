@@ -24,6 +24,8 @@ const ProtectedRoute = ({ children }) => {
 };
 
 function App() {
+  const { token } = useAuth();
+
   return (
     <BrowserRouter basename={routerBasename}>
       <AuthProvider>
@@ -43,7 +45,7 @@ function App() {
             }
           />
         </Routes>
-        <AiAssistant />
+        {token && <AiAssistant />}
       </AuthProvider>
     </BrowserRouter>
   );

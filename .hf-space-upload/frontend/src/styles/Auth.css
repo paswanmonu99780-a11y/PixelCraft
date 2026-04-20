@@ -15,9 +15,10 @@
   width: 100%;
   max-width: 1180px;
   display: grid;
-  grid-template-columns: minmax(320px, 1.05fr) minmax(360px, 0.95fr);
+  grid-template-columns: 1fr;
+  justify-items: center;
+  align-items: center;
   gap: 1.35rem;
-  align-items: stretch;
 }
 
 .auth-showcase,
@@ -138,7 +139,7 @@
   width: 100%;
   max-width: 480px;
   padding: 1.8rem;
-  justify-self: end;
+  justify-self: center;
 }
 
 .auth-card h1,
