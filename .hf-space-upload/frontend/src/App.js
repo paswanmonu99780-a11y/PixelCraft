@@ -9,6 +9,7 @@ import Dashboard from './pages/Dashboard';
 import Explore from './pages/Explore';
 import PublicProfile from './pages/PublicProfile';
 import AiAssistant from './components/AiAssistant';
+import AiVoiceAssistant from './components/AiVoiceAssistant';
 import './styles/App.css';
 
 const routerBasename = process.env.PUBLIC_URL || '/';
@@ -53,6 +54,7 @@ function AppContent() {
             </ProtectedRoute>
           }
         />
+        <Route path="/voice-assistant" element={<AiVoiceAssistant />} />
       </Routes>
       {token && <AiAssistant />}
     </>

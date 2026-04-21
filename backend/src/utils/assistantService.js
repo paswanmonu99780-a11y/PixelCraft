@@ -13,6 +13,7 @@ const {
 
 const OPENAI_API_URL = 'https://api.openai.com/v1';
 const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta';
+const OLLAMA_API_URL = process.env.OLLAMA_API_URL || 'http://localhost:11434';
 const ASSISTANT_NAME = 'AI Helpper';
 const DEFAULT_CHAT_MODELS = ['qwen-2.5-72b-instruct', 'gpt-4o-mini', 'gpt-3.5-turbo'];
 const DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash';
@@ -21,6 +22,7 @@ const DEFAULT_TTS_MODEL = 'tts-1-hd';
 const DEFAULT_TRANSCRIBE_MODEL = 'gpt-4o-mini-transcribe';
 const DEFAULT_REALTIME_VOICE = 'verse';
 const DEFAULT_TTS_VOICE = 'nova';
+const DEFAULT_OLLAMA_MODEL = process.env.OLLAMA_MODEL || 'llama2';
 const CLEAR_INPUT_REPLY = 'Please provide a clear input';
 const REALTIME_VOICE_OPTIONS = new Set(['alloy', 'ash', 'ballad', 'coral', 'echo', 'sage', 'shimmer', 'verse']);
 const CREATOR_PROFILE = {
@@ -36,6 +38,10 @@ const VOICE_NOISE_PATTERN = /^(?:uh+|um+|hmm+|huh+|ah+|mm+|erm+|noise|static|bac
 const trimText = (value = '') => String(value).trim();
 const hasGemini = () => Boolean(trimText(process.env.GEMINI_API_KEY));
 const hasOpenAi = () => Boolean(trimText(process.env.OPENAI_API_KEY));
+const hasOllama = () => {
+  const ollamaUrl = trimText(process.env.OLLAMA_API_URL) || 'http://localhost:11434';
+  return Boolean(ollamaUrl);
+};
 const normalizeInputSource = (value = '') => (trimText(value).toLowerCase() === 'voice' ? 'voice' : 'text');
 const hasMeaningfulInputText = (value = '') => /[A-Za-z0-9\u0900-\u097F]/.test(value);
 const isUnclearAssistantInput = (value = '', { inputSource = 'text' } = {}) => {
@@ -68,12 +74,20 @@ const getPreferredChatProvider = () => {
     return 'openai';
   }
 
+  if (configuredProvider === 'ollama' && hasOllama()) {
+    return 'ollama';
+  }
+
   if (hasGemini()) {
     return 'gemini';
   }
 
   if (hasOpenAi()) {
     return 'openai';
+  }
+
+  if (hasOllama()) {
+    return 'ollama';
   }
 
   return 'local';
@@ -105,6 +119,7 @@ const getRuntimeFeatureStatus = () => {
   const videoStatus = getVideoGenerationStatus();
   const openAiReady = hasOpenAi();
   const geminiReady = hasGemini();
+  const ollamaReady = hasOllama();
 
   const videoSummary = videoStatus.canGenerate
     ? videoStatus.level === 'ready'
@@ -118,14 +133,17 @@ const getRuntimeFeatureStatus = () => {
 
   const chatSummary = geminiReady
     ? `General assistant chat is enabled through Gemini using model ${process.env.GEMINI_MODEL || DEFAULT_GEMINI_MODEL}.`
-    : openAiReady
-      ? `General assistant chat is enabled through OpenAI using model ${process.env.OPENAI_CHAT_MODEL || process.env.OPENAI_MODEL || DEFAULT_CHAT_MODELS[0]}.`
-      : 'General assistant chat is in local fallback mode because neither GEMINI_API_KEY nor OPENAI_API_KEY is configured.';
+    : ollamaReady
+      ? `General assistant chat is enabled through Ollama using model ${process.env.OLLAMA_MODEL || DEFAULT_OLLAMA_MODEL}.`
+      : openAiReady
+        ? `General assistant chat is enabled through OpenAI using model ${process.env.OPENAI_CHAT_MODEL || process.env.OPENAI_MODEL || DEFAULT_CHAT_MODELS[0]}.`
+        : 'General assistant chat is in local fallback mode because no cloud API keys are configured.';
 
   return {
     videoStatus,
     hasOpenAi: openAiReady,
     hasGemini: geminiReady,
+    hasOllama: ollamaReady,
     summary: `${videoSummary} ${liveSummary} ${chatSummary}`,
   };
 };
@@ -553,6 +571,56 @@ const createOpenAiChatReply = async ({ messages, instructions }) => {
   throw lastError || new Error('OpenAI chat request failed');
 };
 
+const createOllamaChatReply = async ({ messages, instructions }) => {
+  const ollamaUrl = trimText(process.env.OLLAMA_API_URL) || 'http://localhost:11434';
+  const model = process.env.OLLAMA_MODEL || DEFAULT_OLLAMA_MODEL;
+
+  const systemMessage = { role: 'system', content: instructions };
+  const conversationMessages = [systemMessage, ...messages];
+
+  try {
+    const response = await fetch(`${ollamaUrl}/api/chat`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model,
+        messages: conversationMessages.map(msg => ({
+          role: msg.role,
+          content: msg.content
+        })),
+        stream: false,
+        options: {
+          temperature: 0.35,
+          num_predict: 650,
+        }
+      }),
+    });
+
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      const apiError = new Error(data?.error || 'Ollama chat request failed');
+      apiError.status = response.status;
+      throw apiError;
+    }
+
+    const content = trimText(data?.message?.content);
+    if (!content) {
+      throw new Error('Ollama returned an empty assistant response');
+    }
+
+    return {
+      model,
+      text: content,
+    };
+  } catch (error) {
+    console.error('Ollama chat error:', error.message);
+    throw error;
+  }
+};
+
 const createChatReply = async ({ messages, pageContext, userId, assistantClientId, inputSource }) => {
   const sanitizedMessages = sanitizeMessages(messages).slice(-24);
   const latestUserPrompt = getLatestUserPrompt(sanitizedMessages);
@@ -593,26 +661,25 @@ const createChatReply = async ({ messages, pageContext, userId, assistantClientI
     };
   }
 
-  // Prioritize ChatGPT (OpenAI chat completions) for all questions when available
-  if (hasOpenAi()) {
+  if (preferredProvider === 'ollama' && hasOllama()) {
     try {
-      const chatGptResult = await createOpenAiChatReply({
+      const ollamaResult = await createOllamaChatReply({
         messages: currentMessages,
         instructions,
       });
 
       return {
-        reply: chatGptResult.text,
-        provider: 'chatgpt-chat-completions',
-        model: chatGptResult.model,
+        reply: ollamaResult.text,
+        provider: 'ollama',
+        model: ollamaResult.model,
         sections: supportingSections.map((section) => section.title),
       };
     } catch (error) {
-      console.error('ChatGPT direct path failed:', error.message);
+      console.error('Ollama path failed:', error.message);
     }
   }
 
-  if (preferredProvider === 'gemini') {
+  if (preferredProvider === 'gemini' && hasGemini()) {
     try {
       const result = await createGeminiReply({
         messages: currentMessages,
@@ -630,22 +697,95 @@ const createChatReply = async ({ messages, pageContext, userId, assistantClientI
     }
   }
 
-    const baseReply = websiteQuestion
-      ? getFallbackReply(latestUserPrompt)
-      : await buildGeneralKnowledgeFallback(latestUserPrompt);
+  if (preferredProvider === 'openai' && hasOpenAi()) {
+    try {
+      const chatGptResult = await createOpenAiChatReply({
+        messages: currentMessages,
+        instructions,
+      });
 
-    return {
-      reply: buildMemoryAwareLocalReply({
-        prompt: latestUserPrompt,
-        rememberedNotes: [],
-        savedNote: null,
-        baseReply,
-      }),
-      provider: 'local-fallback',
-      model: websiteQuestion ? 'knowledge-base' : 'wikipedia-fallback',
-      sections: supportingSections.map((section) => section.title),
-    };
+      return {
+        reply: chatGptResult.text,
+        provider: 'chatgpt-chat-completions',
+        model: chatGptResult.model,
+        sections: supportingSections.map((section) => section.title),
+      };
+    } catch (error) {
+      console.error('ChatGPT direct path failed:', error.message);
+    }
   }
+
+  // Fallback attempts based on availability
+  if (hasOpenAi()) {
+    try {
+      const chatGptResult = await createOpenAiChatReply({
+        messages: currentMessages,
+        instructions,
+      });
+
+      return {
+        reply: chatGptResult.text,
+        provider: 'chatgpt-chat-completions',
+        model: chatGptResult.model,
+        sections: supportingSections.map((section) => section.title),
+      };
+    } catch (error) {
+      console.error('ChatGPT fallback path failed:', error.message);
+    }
+  }
+
+  if (hasGemini()) {
+    try {
+      const result = await createGeminiReply({
+        messages: currentMessages,
+        instructions,
+      });
+
+      return {
+        reply: result.text,
+        provider: 'gemini-generate-content',
+        model: result.model,
+        sections: supportingSections.map((section) => section.title),
+      };
+    } catch (error) {
+      console.error('Gemini fallback path failed:', error.message);
+    }
+  }
+
+  if (hasOllama()) {
+    try {
+      const ollamaResult = await createOllamaChatReply({
+        messages: currentMessages,
+        instructions,
+      });
+
+      return {
+        reply: ollamaResult.text,
+        provider: 'ollama',
+        model: ollamaResult.model,
+        sections: supportingSections.map((section) => section.title),
+      };
+    } catch (error) {
+      console.error('Ollama fallback path failed:', error.message);
+    }
+  }
+
+  const baseReply = websiteQuestion
+    ? getFallbackReply(latestUserPrompt)
+    : await buildGeneralKnowledgeFallback(latestUserPrompt);
+
+  return {
+    reply: buildMemoryAwareLocalReply({
+      prompt: latestUserPrompt,
+      rememberedNotes: [],
+      savedNote: null,
+      baseReply,
+    }),
+    provider: 'local-fallback',
+    model: websiteQuestion ? 'knowledge-base' : 'wikipedia-fallback',
+    sections: supportingSections.map((section) => section.title),
+  };
+};
 
 const createRealtimeSession = async ({ sdp, pageContext, userId, assistantClientId }) => {
   if (!process.env.OPENAI_API_KEY) {
@@ -817,12 +957,14 @@ const getAssistantStatus = () => ({
   strictInputFilteringReady: true,
   multilingualReady: true,
   actionAssistReady: true,
-  fallbackMode: !hasGemini() && !hasOpenAi(),
+  fallbackMode: !hasGemini() && !hasOpenAi() && !hasOllama(),
   configurationNote: hasOpenAi()
     ? 'ChatGPT is now the primary AI brain for all questions. Live talk aur AI voice features bhi active hain.'
     : hasGemini()
       ? 'Gemini text chat active hai. Live talk aur AI voice features ke liye OpenAI key alag se chahiye.'
-      : 'Cloud chat key missing hai. Browser live fallback aur local website knowledge abhi available hain.',
+      : hasOllama()
+        ? 'Ollama local LLM active hai. Fast, private chat without cloud API keys.'
+        : 'Cloud chat key missing hai. Browser live fallback aur local website knowledge abhi available hain.',
   voice: getConfiguredTtsVoice(),
   realtimeVoice: getConfiguredRealtimeVoice(),
   videoStatus: getRuntimeFeatureStatus().videoStatus,
@@ -830,8 +972,11 @@ const getAssistantStatus = () => ({
     chatProvider: getPreferredChatProvider(),
     chat: hasGemini()
       ? process.env.GEMINI_MODEL || DEFAULT_GEMINI_MODEL
-      : process.env.OPENAI_CHAT_MODEL || process.env.OPENAI_MODEL || DEFAULT_CHAT_MODELS[0],
+      : hasOllama()
+        ? process.env.OLLAMA_MODEL || DEFAULT_OLLAMA_MODEL
+        : process.env.OPENAI_CHAT_MODEL || process.env.OPENAI_MODEL || DEFAULT_CHAT_MODELS[0],
     gemini: process.env.GEMINI_MODEL || DEFAULT_GEMINI_MODEL,
+    ollama: process.env.OLLAMA_MODEL || DEFAULT_OLLAMA_MODEL,
     realtime: process.env.OPENAI_REALTIME_MODEL || DEFAULT_REALTIME_MODEL,
     speech: process.env.OPENAI_TTS_MODEL || DEFAULT_TTS_MODEL,
     transcription: process.env.OPENAI_TRANSCRIBE_MODEL || DEFAULT_TRANSCRIBE_MODEL,

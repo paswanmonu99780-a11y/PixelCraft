@@ -28,38 +28,49 @@ export const AuthProvider = ({ children }) => {
   }, [user]);
 
   useEffect(() => {
-    const syncUser = async () => {
+    let isMounted = true;
+
+    const loadUser = async () => {
       if (!token) {
-        setUser(null);
-        setLoading(false);
+        if (isMounted) {
+          setUser(null);
+          setLoading(false);
+        }
         return;
       }
 
+      setLoading(true);
       try {
         const data = await getJson('/api/user/profile', {
           headers: { Authorization: `Bearer ${token}` },
         });
-        setUser(data.user);
+        if (isMounted) {
+          setUser(data.user);
+        }
       } catch (error) {
-        // Don't logout user immediately on first load error
-        console.warn('User sync failed:', error.message);
+        if (error.status === 401 && isMounted) {
+          // Token is invalid, clear auth state and redirect to login
+          setToken(null);
+          setUser(null);
+          // Clear AI Assistant state as well
+          localStorage.removeItem('ai-assistant-open');
+          localStorage.removeItem('ai-assistant-minimized');
+        } else {
+          console.warn('User sync failed:', error.message);
+        }
       } finally {
-        setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     };
 
-    const needsUserRefresh = Boolean(
-      token &&
-      (!user || user.tokenBalance == null || !user.referralCode)
-    );
+    loadUser();
 
-    if (user && !needsUserRefresh) {
-      setLoading(false);
-      return;
-    }
-    
-    syncUser();
-  }, [token, user]);
+    return () => {
+      isMounted = false;
+    };
+  }, [token]);
 
   const login = async (identifier, password, rememberMe = false) => {
     try {

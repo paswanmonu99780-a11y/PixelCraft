@@ -10,6 +10,7 @@ BACKEND_ENV_PATH = ROOT / "backend" / ".env"
 TEMPLATE_DIR = ROOT / "deployment" / "huggingface-space"
 UPLOAD_DIR = ROOT / ".hf-space-upload"
 SPACE_NAME = "pixelcraft"
+DATA_BACKUP_DIR = ROOT / ".data-backup"
 
 
 def load_env_file(path: Path) -> dict[str, str]:
@@ -40,6 +41,34 @@ def copy_tree(src: Path, dst: Path) -> None:
     )
 
 
+def backup_space_data(api: HfApi, repo_id: str) -> None:
+    """Download current memory store files from the live Space to preserve data."""
+    print("Backing up existing Space data...")
+    DATA_BACKUP_DIR.mkdir(parents=True, exist_ok=True)
+
+    try:
+        api.hf_hub_download(
+            repo_id=repo_id,
+            filename="data/memory-store.json",
+            repo_type="space",
+            local_dir=DATA_BACKUP_DIR,
+        )
+        print("  * Backed up memory-store.json")
+    except Exception:
+        print("  * No existing memory-store.json found")
+
+    try:
+        api.hf_hub_download(
+            repo_id=repo_id,
+            filename="data/assistant-memory-store.json",
+            repo_type="space",
+            local_dir=DATA_BACKUP_DIR,
+        )
+        print("  * Backed up assistant-memory-store.json")
+    except Exception:
+        print("  * No existing assistant-memory-store.json found")
+
+
 def prepare_upload_dir() -> None:
     if UPLOAD_DIR.exists():
         shutil.rmtree(UPLOAD_DIR)
@@ -47,8 +76,63 @@ def prepare_upload_dir() -> None:
     UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
     copy_tree(ROOT / "backend", UPLOAD_DIR / "backend")
     copy_tree(ROOT / "frontend", UPLOAD_DIR / "frontend")
+    # Remove pre-built frontend/build - Docker will build from source inside container
+    build_dir = UPLOAD_DIR / "frontend" / "build"
+    if build_dir.exists():
+        shutil.rmtree(build_dir)
+        print("  * Removed pre-built frontend/build (Docker builds)")
     shutil.copy2(TEMPLATE_DIR / "Dockerfile", UPLOAD_DIR / "Dockerfile")
     shutil.copy2(TEMPLATE_DIR / "README.md", UPLOAD_DIR / "README.md")
+
+    # Write a clean .gitignore for the Space repository
+    gitignore_content = """# Dependencies
+node_modules/
+
+# Environment variables
+.env
+backend/.env
+frontend/.env
+
+# Logs
+*.log
+backend-live-out.log
+backend-live-err.log
+frontend-live-out.log
+frontend-live-err.log
+backend-*.txt
+
+# Local data stores (persisted via /data in production)
+backend/src/store/memory-store.json
+backend/src/store/assistant-memory-store.json
+backend/generated-media/
+
+# IDE
+.vscode/
+
+# Build artifacts (built in Docker)
+frontend/build/
+"""
+    (UPLOAD_DIR / ".gitignore").write_text(gitignore_content, encoding="utf-8")
+    print("  * Written .gitignore")
+
+    # Create data persistence directory structure
+    data_dir = UPLOAD_DIR / "data"
+    data_dir.mkdir(parents=True, exist_ok=True)
+
+    # Restore backed-up store files if they exist, otherwise copy current ones
+    backend_store = ROOT / "backend" / "src" / "store"
+
+    if (DATA_BACKUP_DIR / "memory-store.json").exists():
+        shutil.copy2(DATA_BACKUP_DIR / "memory-store.json", data_dir / "memory-store.json")
+        print("  * Restored memory-store.json from backup")
+    elif (backend_store / "memory-store.json").exists():
+        shutil.copy2(backend_store / "memory-store.json", data_dir / "memory-store.json")
+
+    if (DATA_BACKUP_DIR / "assistant-memory-store.json").exists():
+        shutil.copy2(DATA_BACKUP_DIR / "assistant-memory-store.json", data_dir / "assistant-memory-store.json")
+        print("  * Restored assistant-memory-store.json from backup")
+    elif (backend_store / "assistant-memory-store.json").exists():
+        shutil.copy2(backend_store / "assistant-memory-store.json", data_dir / "assistant-memory-store.json")
 
 
 def main() -> None:
@@ -62,6 +146,9 @@ def main() -> None:
     username = whoami["name"]
     repo_id = f"{username}/{SPACE_NAME}"
     space_origin = f"https://{username.replace('_', '-')}-{SPACE_NAME}.hf.space"
+
+    # Backup existing data from the Space to preserve user tokens/memories
+    backup_space_data(api, repo_id)
 
     prepare_upload_dir()
 

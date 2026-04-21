@@ -10,7 +10,11 @@ const {
   normalizeReferralCode,
 } = require('../utils/tokenUtils');
 
-const STORE_FILE_PATH = path.join(__dirname, 'memory-store.json');
+// Use /data directory for persistent storage in production, local path for dev
+const isProduction = process.env.NODE_ENV === 'production';
+const STORE_FILE_PATH = isProduction
+  ? path.join('/data', 'memory-store.json')
+  : path.join(__dirname, 'memory-store.json');
 
 const state = {
   users: [],

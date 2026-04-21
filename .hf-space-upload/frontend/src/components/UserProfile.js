@@ -17,7 +17,7 @@ const UserProfile = ({ user }) => {
   const [avatarUrl, setAvatarUrl] = useState(user?.avatarUrl || '');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
-  const { token, setUser } = useAuth();
+  const { token, setUser, logout } = useAuth();
   const inviteLink = user?.referralCode
     ? `${window.location.origin}/signup?ref=${encodeURIComponent(user.referralCode)}`
     : '';
@@ -198,6 +198,12 @@ const UserProfile = ({ user }) => {
               </div>
             </form>
           )}
+        </div>
+
+        <div className="profile-actions">
+          <button className="logout-btn" onClick={logout} title="Logout">
+            Logout
+          </button>
         </div>
       </div>
     </div>

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import heroArtwork from '../assets/media-studio-hero.png';
 import '../styles/Landing.css';
 
@@ -27,7 +28,15 @@ const featureItems = [
 ];
 
 const Landing = () => {
+  const { token, loading } = useAuth();
+  const navigate = useNavigate();
   const [isDarkMode, setIsDarkMode] = useState(false);
+
+  useEffect(() => {
+    if (!loading && token) {
+      navigate('/dashboard', { replace: true });
+    }
+  }, [token, loading, navigate]);
 
   useEffect(() => {
     const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;

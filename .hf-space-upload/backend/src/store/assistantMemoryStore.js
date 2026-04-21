@@ -1,7 +1,10 @@
 const fs = require('fs');
 const path = require('path');
 
-const STORE_FILE_PATH = path.join(__dirname, 'assistant-memory-store.json');
+const isProduction = process.env.NODE_ENV === 'production';
+const STORE_FILE_PATH = isProduction
+  ? path.join('/data', 'assistant-memory-store.json')
+  : path.join(__dirname, 'assistant-memory-store.json');
 const MAX_NOTES_PER_PROFILE = 24;
 
 const state = {

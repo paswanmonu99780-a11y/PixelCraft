@@ -23,7 +23,7 @@ const isClearAssistantInput = (value = '') => {
 };
 
 const AiVoiceAssistant = () => {
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
@@ -158,11 +158,31 @@ const AiVoiceAssistant = () => {
     stopListening();
     setIsSpeaking(true);
 
-    // Try to use browser speech synthesis first
+    // Try to use browser speech synthesis first with Indian English preference
     if (window.speechSynthesis) {
       window.speechSynthesis.cancel();
       const utterance = new window.SpeechSynthesisUtterance(text);
-      utterance.lang = navigator.language || 'en-IN';
+
+      // Find best voice - prefer Indian English, then other non-US English
+      const voices = window.speechSynthesis.getVoices();
+      let selectedVoice = voices.find(voice =>
+        voice.lang.includes('en-IN') ||
+        voice.name.toLowerCase().includes('indian')
+      );
+
+      if (!selectedVoice) {
+        selectedVoice = voices.find(voice =>
+          voice.lang.startsWith('en-') && voice.lang !== 'en-US'
+        );
+      }
+
+      if (selectedVoice) {
+        utterance.voice = selectedVoice;
+        utterance.lang = selectedVoice.lang;
+      } else {
+        utterance.lang = 'en-IN';
+      }
+
       utterance.rate = 0.9;
       utterance.pitch = 1.0;
       utterance.volume = 0.8;
@@ -231,7 +251,7 @@ const AiVoiceAssistant = () => {
   return (
     <div className="ai-voice-assistant">
       <div className="voice-assistant-header">
-        <h1>AI Voice Assistant</h1>
+        <h1>{user?.username ? `${user.username}'s AI Voice Assistant` : 'AI Voice Assistant'}</h1>
         <p>Click the call button and speak naturally</p>
       </div>
 

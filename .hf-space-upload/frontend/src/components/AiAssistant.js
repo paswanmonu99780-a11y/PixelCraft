@@ -1,16 +1,22 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Mic, MicOff, Send, Volume2, VolumeX, Bot, X, Minimize2, Maximize2 } from 'lucide-react';
+import { Mic, MicOff, Send, Volume2, VolumeX, Bot, X, Minimize2, Maximize2, Plus } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { apiUrl } from '../utils/api';
 import '../styles/AiHelpperWidget.css';
 
-const WELCOME_MESSAGE = {
+const WELCOME_MESSAGE = (userName = '') => ({
   id: 'welcome',
   role: 'assistant',
-  content: 'Hello! I am your AI Assistant. I can help you with:\n\n• Generating images and exploring the website\n• Answer questions about any topic\n• Chatting naturally in any language\n• Controlling website features\n\nHow can I help you today?'
-};
+  content: `Namaste${userName ? ` ${userName}` : ''}! I am your AI assistant.\n\n` +
+    'I know everything about this website and can guide you through every feature.\n\n' +
+    'You can ask me:\n' +
+    '• How to generate images and videos\n' +
+    '• How tokens work (5 tokens per image)\n' +
+    '• About any button, setting, or feature\n' +
+    '• Anything else you need help with\n\n' +
+    'Feel free to chat in Hindi, English, or Hinglish!'
+});
 
-const DEFAULT_ADVANCED_WELCOME_MESSAGE = 'Hello! I am your advanced AI Assistant.\n\nI can help you with:\n\n- Technology, coding, business, study, and general questions\n- Step-by-step explanations in simple language\n- Full code examples and debugging help\n- Hindi, English, or Hinglish conversations\n- Website guidance and feature support\n\nTell me what you want to do, and I will help properly.';
 const CLEAR_INPUT_MESSAGE = 'Please provide a clear input';
 const VOICE_NOISE_ONLY_PATTERN = /^(?:uh+|um+|hmm+|huh+|ah+|mm+|erm+|noise|static|background noise|ambient noise|music|youtube|video|video playing|song|audio)\W*$/i;
 
@@ -36,7 +42,7 @@ const isClearAssistantInput = (value = '', { source = 'text' } = {}) => {
 };
 
 const AiAssistant = () => {
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const [isOpen, setIsOpen] = useState(() => {
     return false;
   });
@@ -44,15 +50,27 @@ const AiAssistant = () => {
     const saved = localStorage.getItem('ai-assistant-minimized');
     return saved !== null ? JSON.parse(saved) : false;
   });
+  const [isFullscreen, setIsFullscreen] = useState(() => {
+    const saved = localStorage.getItem('ai-assistant-fullscreen');
+    return saved !== null ? JSON.parse(saved) : false;
+  });
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
-  const [messages, setMessages] = useState([{ ...WELCOME_MESSAGE, content: DEFAULT_ADVANCED_WELCOME_MESSAGE }]);
+  const [currentUserName, setCurrentUserName] = useState(user?.username || '');
+  const [messages, setMessages] = useState([WELCOME_MESSAGE(currentUserName)]);
   const [input, setInput] = useState('');
   const [micLevel, setMicLevel] = useState(0);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  
+  const [isInCall, setIsInCall] = useState(false);
+
+  useEffect(() => {
+    if (user?.username) {
+      setCurrentUserName(user.username);
+    }
+  }, [user]);
+
   const messagesEndRef = useRef(null);
   const recognitionRef = useRef(null);
   const synthRef = useRef(null);
@@ -77,8 +95,23 @@ const AiAssistant = () => {
   }, [isOpen]);
 
   useEffect(() => {
+    if (user?.username) {
+      setCurrentUserName(user.username);
+    }
+  }, [user]);
+
+  useEffect(() => {
     localStorage.setItem('ai-assistant-minimized', JSON.stringify(isMinimized));
   }, [isMinimized]);
+
+  useEffect(() => {
+    localStorage.setItem('ai-assistant-fullscreen', JSON.stringify(isFullscreen));
+  }, [isFullscreen]);
+
+  // Update isInCall when speaking or listening changes
+  useEffect(() => {
+    setIsInCall(isSpeaking || isListening);
+  }, [isSpeaking, isListening]);
 
   const appendAssistantMessage = (content) => {
     setMessages(prev => [...prev, { id: `asst-${Date.now()}`, role: 'assistant', content }]);
@@ -162,23 +195,44 @@ const AiAssistant = () => {
     }
   };
 
-  const speakText = (text) => {
-    if (!window.speechSynthesis) return;
-    
-    window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(text);
-    synthRef.current = utterance;
-    utterance.lang = 'en-IN';
-    utterance.rate = 0.9;
-    utterance.pitch = 1;
-    utterance.volume = 0.8;
-    
-    utterance.onstart = () => setIsSpeaking(true);
-    utterance.onend = () => setIsSpeaking(false);
-    utterance.onerror = () => setIsSpeaking(false);
-    
-    window.speechSynthesis.speak(utterance);
-  };
+   const speakText = (text) => {
+     if (!window.speechSynthesis) return;
+
+     window.speechSynthesis.cancel();
+
+     const utterance = new SpeechSynthesisUtterance(text);
+     synthRef.current = utterance;
+
+     // Try to find an Indian English voice, fallback to any English voice
+     const voices = window.speechSynthesis.getVoices();
+     let selectedVoice = voices.find(voice =>
+       voice.lang.includes('en-IN') ||
+       voice.name.toLowerCase().includes('indian')
+     );
+
+     if (!selectedVoice) {
+       selectedVoice = voices.find(voice =>
+         voice.lang.startsWith('en-') && voice.lang !== 'en-US'
+       );
+     }
+
+     if (selectedVoice) {
+       utterance.voice = selectedVoice;
+       utterance.lang = selectedVoice.lang;
+     } else {
+       utterance.lang = 'en-US'; // Final fallback
+     }
+
+     utterance.rate = 0.92;
+     utterance.pitch = 1.0;
+     utterance.volume = 0.9;
+
+     utterance.onstart = () => setIsSpeaking(true);
+     utterance.onend = () => setIsSpeaking(false);
+     utterance.onerror = () => setIsSpeaking(false);
+
+     window.speechSynthesis.speak(utterance);
+   };
 
   const toggleListening = async () => {
     if (isListening) {
@@ -266,6 +320,10 @@ const AiAssistant = () => {
     }
   };
 
+  const toggleFullscreen = () => {
+    setIsFullscreen(!isFullscreen);
+  };
+
   const clearChat = () => {
     recognitionRef.current?.stop();
     recognitionRef.current = null;
@@ -278,7 +336,7 @@ const AiAssistant = () => {
     setIsSpeaking(false);
     setIsConnected(false);
     setMicLevel(0);
-    setMessages([{ ...WELCOME_MESSAGE, content: DEFAULT_ADVANCED_WELCOME_MESSAGE }]);
+     setMessages([WELCOME_MESSAGE(currentUserName)]);
   };
 
   if (!isOpen) {
@@ -294,18 +352,18 @@ const AiAssistant = () => {
   }
 
   return (
-    <div className={`ai-assistant-container ${isMinimized ? 'minimized' : ''}`}>
+    <div className={`ai-assistant-container ${isMinimized ? 'minimized' : ''} ${isFullscreen ? 'fullscreen' : ''}`}>
       <div className="ai-assistant-header">
         <div className="ai-header-left">
-          <Bot size={20} />
-          <span>AI Assistant</span>
+          <Bot size={18} />
+          <span>{currentUserName ? `${currentUserName}'s AI Assistant` : 'AI Assistant'}</span>
         </div>
         <div className="ai-header-actions">
-          <button onClick={() => setIsMinimized(!isMinimized)} title={isMinimized ? 'Expand' : 'Minimize'}>
-            {isMinimized ? <Maximize2 size={16} /> : <Minimize2 size={16} />}
+          <button onClick={clearChat} className="new-chat-btn" title="New chat">
+            <Plus size={16} />
           </button>
-          <button onClick={clearChat} title="New chat">
-            <X size={16} />
+          <button onClick={toggleFullscreen} title={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}>
+            {isFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
           </button>
           <button onClick={() => setIsOpen(false)} title="Close">
             <X size={16} />
@@ -313,20 +371,47 @@ const AiAssistant = () => {
         </div>
       </div>
 
+      {/* Live Call Overlay - Shows when voice is active */}
+      {isInCall && !isMinimized && (
+        <div className="live-call-overlay">
+          <div className="call-background-effect" />
+          <div className="call-interface">
+            <div className="ai-face-circle">
+              <div className={`ai-face-pulse ${isSpeaking ? 'speaking' : isListening ? 'listening' : ''}`}>
+                <Bot size={isFullscreen ? 64 : 48} />
+              </div>
+              <div className="call-status">
+                {isSpeaking ? 'AI is speaking...' : isListening ? 'Listening...' : 'Connected'}
+              </div>
+            </div>
+            <button
+              className="call-end-btn"
+              onClick={() => {
+                if (isListening) toggleListening();
+                if (isSpeaking) toggleVoice();
+              }}
+              title="End call"
+            >
+              <X size={20} />
+            </button>
+          </div>
+        </div>
+      )}
+
       {!isMinimized && (
         <>
           <div className="ai-messages">
             {messages.map((msg) => (
               <div key={msg.id} className={`ai-message ${msg.role}`}>
                 <div className="message-role">
-                  {msg.role === 'assistant' ? <Bot size={14} /> : 'You'}
+                  {msg.role === 'assistant' ? <Bot size={12} /> : 'You'}
                 </div>
                 <div className="message-content">{msg.content}</div>
               </div>
             ))}
             {isLoading && (
               <div className="ai-message assistant loading">
-                <div className="message-role"><Bot size={14} /></div>
+                <div className="message-role"><Bot size={12} /></div>
                 <div className="message-content">Thinking...</div>
               </div>
             )}
@@ -336,28 +421,28 @@ const AiAssistant = () => {
           <div className="ai-controls">
             <div className="mic-visualizer">
               {[0,1,2,3,4].map(i => (
-                <span 
-                  key={i} 
+                <span
+                  key={i}
                   className={`bar ${isListening ? 'active' : ''}`}
-                  style={{ height: isListening ? `${20 + Math.random() * 40}px` : '4px' }}
+                  style={{ height: isListening ? `${16 + Math.random() * 30}px` : '3px' }}
                 />
               ))}
             </div>
             <div className="ai-buttons">
-              <button 
+              <button
                 className={`ai-btn ${isListening ? 'listening' : ''}`}
                 onClick={toggleListening}
                 title={isListening ? 'Stop' : 'Voice input'}
               >
-                {isListening ? <MicOff size={18} /> : <Mic size={18} />}
+                {isListening ? <MicOff size={16} /> : <Mic size={16} />}
               </button>
-              <button 
+              <button
                 className={`ai-btn ${isSpeaking ? 'speaking' : ''}`}
                 onClick={toggleVoice}
                 title={isSpeaking ? 'Stop' : 'Listen'}
                 disabled={!messages.filter(m => m.role === 'assistant').length}
               >
-                {isSpeaking ? <VolumeX size={18} /> : <Volume2 size={18} />}
+                {isSpeaking ? <VolumeX size={16} /> : <Volume2 size={16} />}
               </button>
             </div>
           </div>
@@ -371,7 +456,7 @@ const AiAssistant = () => {
               disabled={isLoading}
             />
             <button type="submit" disabled={!input.trim() || isLoading}>
-              <Send size={18} />
+              <Send size={16} />
             </button>
           </form>
 

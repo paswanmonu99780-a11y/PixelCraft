@@ -137,17 +137,17 @@ const getFileExtension = (assetUrl = '', assetType = 'image') => {
   return 'jpg';
 };
 
-const getPromptPlaceholder = (mode) => {
-  if (mode === 'text-to-video') {
-    return 'Describe the video you want to create... (e.g., a neon cyberpunk street with camera motion)';
-  }
+  const getPromptPlaceholder = (mode) => {
+    if (mode === 'text-to-video') {
+      return 'Describe the video you want to create... (e.g., neon cyberpunk street, camera motion)';
+    }
 
-  if (mode === 'image-to-video') {
-    return 'Optional: describe how the image should animate...';
-  }
+    if (mode === 'image-to-video') {
+      return 'Optional: describe how the image should animate...';
+    }
 
-  return 'Describe the image you want to create... (e.g., a futuristic city at sunset)';
-};
+    return 'Describe the image you want to create... (e.g., futuristic city at sunset)';
+  };
 
 const getGenerateButtonLabel = (mode, loading) => {
   if (loading) {
@@ -582,7 +582,7 @@ const ImageGenerator = () => {
         setUser(data.currentUser);
       }
 
-      setPublishMessage(data.message || 'Image published to Explore!');
+      setPublishMessage(data.message || 'Published to Explore!');
     } catch (err) {
       setPublishMessage(err.message || 'Could not publish image');
     } finally {
@@ -605,26 +605,6 @@ const ImageGenerator = () => {
   return (
     <div className="image-generator">
       <div className="generator-form">
-        <div className="studio-intro">
-          <div className="studio-intro-copy">
-            <p className="studio-kicker">Create Media</p>
-            <h2>Design stills, motion concepts, and publish-ready visuals</h2>
-            <p className="studio-subtitle">
-              Switch between image and video modes, fine-tune the output, and keep your best results ready for download or sharing.
-            </p>
-          </div>
-          <div className="studio-pulse-board" aria-hidden="true">
-            <span>Image</span>
-            <span>Motion</span>
-            <span>Export</span>
-          </div>
-        </div>
-
-        <div className="token-banner">
-          <strong>{user?.tokenBalance ?? 0} tokens available</strong>
-          <span>Text-to-image ke liye 1 token use hota hai. Signup bonus 50 tokens milte hain.</span>
-        </div>
-
         <div className="mode-selector" aria-label="Generation mode">
           {GENERATION_MODES.map((modeOption) => (
             <button
@@ -648,15 +628,15 @@ const ImageGenerator = () => {
                 <input type="file" accept="image/*" onChange={handleSourceImageChange} disabled={loading} />
               </label>
 
-              {sourceImage && (
-                <div className="source-preview">
-                  <img src={sourceImage} alt={sourceImageName || 'Source preview'} />
-                  <div>
-                    <strong>{sourceImageName || 'Source image selected'}</strong>
-                    <p>This image will be animated into a short video.</p>
+                {sourceImage && (
+                  <div className="source-preview">
+                    <img src={sourceImage} alt={sourceImageName || 'Source preview'} />
+                    <div>
+                      <strong>{sourceImageName || 'Source image selected'}</strong>
+                      <p>This will animate into a short video.</p>
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
             </div>
           )}
 
@@ -676,24 +656,18 @@ const ImageGenerator = () => {
 
           <p className="input-helper">
             {isTextToImageMode
-              ? 'Text to Image is ready to use now.'
-              : 'Video modes use the backend video inference configuration. For the best chance of success, set backend/.env with HUGGING_FACE_VIDEO_API_KEY or PIAPI_API_KEY. The backend now auto-falls back between supported Wan video providers.'}
+              ? 'Enter a prompt to generate an image.'
+              : 'Video modes require HUGGING_FACE_VIDEO_API_KEY or PIAPI_API_KEY in backend/.env'}
           </p>
 
           {!isTextToImageMode && (
             <div className={`video-status-banner ${videoStatusToneClass}`}>
-              <strong>{videoStatusLoading ? 'Checking video setup...' : 'Video Setup Status'}</strong>
+              <strong>{videoStatusLoading ? 'Checking setup...' : 'Video Setup'}</strong>
               <span>
                 {videoStatusLoading
-                  ? 'Reading backend video configuration for this environment.'
-                  : videoStatus?.message || 'Video setup details are unavailable right now.'}
+                  ? 'Reading backend configuration...'
+                  : videoStatus?.message || 'Video configuration unavailable.'}
               </span>
-              {!videoStatusLoading && videoStatus && (
-                <small className="video-status-meta">
-                  Backend: {videoStatus.selectedBackend || 'auto'}
-                  {videoStatus.provider ? ` | Provider: ${videoStatus.provider}` : ''}
-                </small>
-              )}
             </div>
           )}
 
@@ -815,28 +789,28 @@ const ImageGenerator = () => {
             />
           )}
 
-          {result.generationMode === 'image-to-video' && result.sourceImagePreview && (
-            <div className="source-preview result-source-preview">
-              <img src={result.sourceImagePreview} alt={result.sourceImageName || 'Source image'} />
-              <div>
-                <strong>{result.sourceImageName || 'Source image'}</strong>
-                <p>Animated into the video above.</p>
-              </div>
-            </div>
-          )}
+           {result.generationMode === 'image-to-video' && result.sourceImagePreview && (
+             <div className="source-preview result-source-preview">
+               <img src={result.sourceImagePreview} alt={result.sourceImageName || 'Source image'} />
+               <div>
+                 <strong>{result.sourceImageName || 'Source image'}</strong>
+                 <p>Animated into video above.</p>
+               </div>
+             </div>
+           )}
 
           <div className="image-info">
             <div className="image-meta">
               <span className="meta-pill">
-                Mode: {findModeLabel(result.generationMode)}
+                {findModeLabel(result.generationMode)}
               </span>
               {result.assetType === 'image' && (
                 <>
                   <span className="meta-pill">
-                    Ratio: {findOptionLabel(RATIO_OPTIONS, result.ratio)}
+                    {findOptionLabel(RATIO_OPTIONS, result.ratio)}
                   </span>
                   <span className="meta-pill">
-                    Quality: {findOptionLabel(QUALITY_OPTIONS, result.quality)}
+                    {findOptionLabel(QUALITY_OPTIONS, result.quality)}
                   </span>
                 </>
               )}
@@ -844,16 +818,16 @@ const ImageGenerator = () => {
 
             {result.prompt ? (
               <>
-                <p className="prompt-label">Prompt:</p>
+                <p className="prompt-label">Prompt</p>
                 <p className="prompt-text">{result.prompt}</p>
               </>
             ) : (
-              <p className="generator-note">No animation prompt was provided for this image-to-video generation.</p>
+              <p className="generator-note">No prompt provided for this generation.</p>
             )}
 
             {result.assetType === 'video' && (
               <p className="generator-note">
-                Video outputs can be downloaded or shared by link. Explore and history remain image-only for now.
+                Download or share the video. Explore and history remain image-only.
               </p>
             )}
 

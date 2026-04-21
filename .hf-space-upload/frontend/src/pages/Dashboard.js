@@ -14,30 +14,30 @@ import {
 import '../styles/Dashboard.css';
 
 const Dashboard = () => {
-  const { user, token, logout } = useAuth();
+  const { user, token } = useAuth();
   const [activeTab, setActiveTab] = useState('generate');
   const navigate = useNavigate();
 
   const dashboardCopy = {
     generate: {
-      eyebrow: 'Creative Studio',
-      title: 'Create image drops and motion ideas',
-      subtitle: 'Build polished media, test prompts faster, and export your favorite results without leaving the studio.',
+      eyebrow: '',
+      title: '',
+      subtitle: '',
     },
     history: {
-      eyebrow: 'Archive',
-      title: 'Track every generated frame',
-      subtitle: 'Review previous results, revisit strong prompts, and keep your best visual directions close at hand.',
+      eyebrow: 'History',
+      title: 'Your generated images',
+      subtitle: 'Review previous results and revisit strong prompts.',
     },
     community: {
       eyebrow: 'Community',
-      title: 'Share work and explore creators',
-      subtitle: 'Publish standout images, browse what others are making, and keep the feedback loop alive.',
+      title: 'Share and discover',
+      subtitle: 'Publish images, browse the feed',
     },
     profile: {
       eyebrow: 'Profile',
-      title: 'Keep your studio identity tidy',
-      subtitle: 'Manage your account details and make sure your creator profile stays ready for sharing.',
+      title: 'Account settings',
+      subtitle: 'Manage your profile and token balance.',
     },
   };
 
@@ -81,11 +81,6 @@ const Dashboard = () => {
     };
   }, []);
 
-  const handleLogout = () => {
-    logout();
-    navigate('/');
-  };
-
   const handleOpenProfile = () => {
     setActiveTab('profile');
   };
@@ -94,13 +89,13 @@ const Dashboard = () => {
 
   return (
     <div className="dashboard-container">
-      <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} onLogout={handleLogout} user={user} />
+      <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
       <div className="dashboard-content">
         <header className="dashboard-header">
           <div className="dashboard-title-group">
-            <p className="dashboard-eyebrow">{headerCopy.eyebrow}</p>
-            <h1>{headerCopy.title}</h1>
-            <p className="dashboard-subtitle">{headerCopy.subtitle}</p>
+            {headerCopy.eyebrow && <p className="dashboard-eyebrow">{headerCopy.eyebrow}</p>}
+            {headerCopy.title && <h1>{headerCopy.title}</h1>}
+            {headerCopy.subtitle && <p className="dashboard-subtitle">{headerCopy.subtitle}</p>}
           </div>
           <button
             type="button"
@@ -109,10 +104,6 @@ const Dashboard = () => {
             aria-label="Open profile"
             title="Open profile"
           >
-            <div className="dashboard-presence">
-              <span className="dashboard-presence-dot"></span>
-              Studio online
-            </div>
             {user?.avatarUrl ? (
               <img src={user.avatarUrl} alt={user?.username || 'Creator'} className="user-avatar-chip" />
             ) : (
@@ -122,7 +113,6 @@ const Dashboard = () => {
             )}
             <div className="dashboard-user-copy">
               <strong>{user?.username || 'Creator'}</strong>
-              <span>{user?.contactValue || 'Creative account'}</span>
               <em className="dashboard-token-balance">{user?.tokenBalance ?? 0} tokens</em>
             </div>
           </button>
@@ -134,8 +124,8 @@ const Dashboard = () => {
           {activeTab === 'community' && (
             <PublicGallery
               showComposer
-              title="Creator Community"
-              subtitle="Upload images, publish your work, and search the public feed"
+              title="Community"
+              subtitle="Share images, browse the feed"
             />
           )}
           {activeTab === 'profile' && <UserProfile user={user} />}

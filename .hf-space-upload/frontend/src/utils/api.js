@@ -17,12 +17,27 @@ const API_BASE_URL = rawBaseUrl.endsWith('/api') ? rawBaseUrl.slice(0, -4) : raw
 export const apiUrl = (path) => `${API_BASE_URL}${path}`;
 
 export const getJson = async (path, options = {}) => {
-  const response = await fetch(apiUrl(path), options);
-  const data = await response.json().catch(() => ({}));
+  try {
+    const response = await fetch(apiUrl(path), options);
 
-  if (!response.ok) {
-    throw new Error(data.error || 'Request failed');
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      const err = new Error(data.error || 'Request failed');
+      err.status = response.status;
+      throw err;
+    }
+
+    return await response.json();
+  } catch (err) {
+    if (err.message === 'Failed to fetch' || err.name === 'TypeError') {
+      const serverInfo = process.env.REACT_APP_API_URL
+        ? `API URL: ${process.env.REACT_APP_API_URL}`
+        : `Expected backend at: ${apiUrl('')}`;
+      const message = `Cannot connect to server.\n\nPlease ensure the backend server is running.\n\n${serverInfo}`;
+      const friendlyErr = new Error(message);
+      friendlyErr.status = err.status || 0;
+      throw friendlyErr;
+    }
+    throw err;
   }
-
-  return data;
 };

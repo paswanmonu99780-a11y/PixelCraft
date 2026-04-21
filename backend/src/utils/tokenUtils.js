@@ -1,12 +1,13 @@
 const crypto = require('crypto');
 
-const DEFAULT_STARTING_TOKENS = 50;
-const IMAGE_GENERATION_TOKEN_COST = 1;
-const GALLERY_UPLOAD_REWARD = 10;
-const POST_LIKE_REWARD = 3;
-const FOLLOW_REWARD = 15;
-const INVITE_REWARD = 70;
-const TOKEN_HISTORY_LIMIT = 30;
+// Configurable token economics via environment variables
+const DEFAULT_STARTING_TOKENS = Number(process.env.DEFAULT_STARTING_TOKENS) || 50;
+const IMAGE_GENERATION_TOKEN_COST = Number(process.env.IMAGE_GENERATION_TOKEN_COST) || 5;
+const GALLERY_UPLOAD_REWARD = Number(process.env.GALLERY_UPLOAD_REWARD) || 10;
+const POST_LIKE_REWARD = Number(process.env.POST_LIKE_REWARD) || 3;
+const FOLLOW_REWARD = Number(process.env.FOLLOW_REWARD) || 15;
+const INVITE_REWARD = Number(process.env.INVITE_REWARD) || 70;
+const TOKEN_HISTORY_LIMIT = Number(process.env.TOKEN_HISTORY_LIMIT) || 30;
 
 const normalizeStringList = (values = []) => (
   Array.isArray(values)

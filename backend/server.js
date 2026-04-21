@@ -13,7 +13,37 @@ const { setDatabaseReady, shouldUseMemoryStore } = require('./src/config/dbMode'
 
 const app = express();
 
-// Middleware - Enable CORS for all origins
+// Determine if we should ONLY use memory store (forced via env)
+const forceMemoryStore = () => String(process.env.USE_MEMORY_DB || '').toLowerCase() === 'true';
+
+// Database Connection
+if (forceMemoryStore()) {
+  setDatabaseReady(false);
+  console.warn('USE_MEMORY_DB enabled, skipping MongoDB connection');
+} else {
+  mongoose.connection.on('connected', () => {
+    setDatabaseReady(true);
+    console.log('MongoDB connected');
+  });
+
+  mongoose.connection.on('disconnected', () => {
+    setDatabaseReady(false);
+    console.warn('MongoDB disconnected, using in-memory fallback store');
+  });
+
+  mongoose
+    .connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/image-generator')
+    .then(() => {
+      console.log('MongoDB connection established');
+    })
+    .catch((err) => {
+      console.error('MongoDB connection error:', err.message);
+      console.warn('Continuing with in-memory fallback store');
+      setDatabaseReady(false);
+    });
+}
+
+// Middleware
 app.use(cors());
 app.use(express.json({ limit: '20mb' }));
 
@@ -28,30 +58,6 @@ const normalizedFrontendBasePath = (() => {
   return `/${configuredBasePath.replace(/^\/+|\/+$/g, '')}`;
 })();
 const hasFrontendBuild = fs.existsSync(frontendIndexPath);
-
-// Database Connection
-if (shouldUseMemoryStore()) {
-  setDatabaseReady(false);
-  console.warn('USE_MEMORY_DB enabled, skipping MongoDB connection');
-} else {
-  mongoose.connection.on('connected', () => {
-    setDatabaseReady(true);
-    console.log('MongoDB connected');
-  });
-
-  mongoose.connection.on('disconnected', () => {
-    setDatabaseReady(false);
-    console.warn('MongoDB disconnected, using in-memory fallback');
-  });
-
-  mongoose
-    .connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/image-generator')
-    .catch((err) => {
-      setDatabaseReady(false);
-      console.error('MongoDB connection error:', err.message);
-      console.warn('Continuing with in-memory fallback store');
-    });
-}
 
 // Routes
 app.use('/api/auth', authRoutes);

@@ -179,49 +179,45 @@
   padding: 1.5rem;
 }
 
-@media (max-width: 1080px) {
-  .dashboard-header {
-    flex-direction: column;
-    align-items: flex-start;
-  }
+ @media (max-width: 768px) {
+   .dashboard-container {
+     flex-direction: column;
+   }
 
-  .user-badge {
-    width: 100%;
-    justify-content: space-between;
-    flex-wrap: wrap;
-  }
-}
+   .dashboard-header {
+     display: none;
+   }
 
-@media (max-width: 768px) {
-  .dashboard-container {
-    flex-direction: column;
-  }
+   .dashboard-main {
+     padding: 0.5rem;
+   }
 
-  .dashboard-header {
-    margin: 1rem;
-    padding: 1.2rem;
-    border-radius: 22px;
-  }
+   .sidebar {
+     width: auto;
+     margin: 1rem 1rem 0;
+     padding: 1rem;
+     border-radius: 24px;
+   }
 
-  .dashboard-header h1 {
-    font-size: 1.6rem;
-  }
+   .sidebar-nav {
+     flex-direction: row;
+     overflow-x: auto;
+     padding-bottom: 0.25rem;
+     -webkit-overflow-scrolling: touch;
+   }
 
-  .user-badge {
-    gap: 0.75rem;
-    padding: 0.85rem;
-  }
+   .nav-item {
+     min-width: max-content;
+     padding: 0.85rem 0.95rem;
+     font-size: 0.9rem;
+     white-space: nowrap;
+   }
 
-  .dashboard-presence {
-    order: 3;
-    width: 100%;
-    justify-content: center;
-  }
-
-  .dashboard-main {
-    padding: 1rem;
-  }
-}
+   .logout-btn {
+     width: 100%;
+     margin-top: 0.5rem;
+   }
+ }
 .dashboard-token-balance {
   font-style: normal;
   color: #b45309;

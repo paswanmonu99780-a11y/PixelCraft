@@ -13,8 +13,10 @@ RUN npm install --prefix backend --omit=dev \
 
 COPY backend ./backend
 COPY frontend ./frontend
+COPY data ./data
 
-# Frontend is pre-built, no need to build in Docker
+# Build frontend inside Docker (with increased memory)
+RUN npm run build --prefix frontend
 
 ENV NODE_ENV=production
 ENV PORT=7860

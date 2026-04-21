@@ -1,22 +1,25 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { Menu } from 'lucide-react';
 import '../styles/Sidebar.css';
 
-const Sidebar = ({ activeTab, setActiveTab, onLogout, user }) => {
+const Sidebar = ({ activeTab, setActiveTab }) => {
+  const [isCollapsed, setIsCollapsed] = useState(false);
   const menuItems = [
-    { id: 'generate', label: 'Create Media', icon: 'GEN' },
-    { id: 'history', label: 'History', icon: 'HIS' },
-    { id: 'community', label: 'Community', icon: 'EXP' },
-    { id: 'profile', label: 'Profile', icon: 'YOU' },
+    { id: 'generate', icon: 'GEN' },
+    { id: 'history', icon: 'HIS' },
+    { id: 'community', icon: 'EXP' },
   ];
 
   return (
-    <aside className="sidebar">
-      <div className="sidebar-header">
-        <p className="sidebar-kicker">Creator Suite</p>
-        <h2>Nova Canvas</h2>
-        <span className="sidebar-subtitle">Sharper visuals. Cleaner workflow.</span>
-        <div className="sidebar-token-chip">{user?.tokenBalance ?? 0} tokens</div>
-      </div>
+    <aside className={`sidebar ${isCollapsed ? 'collapsed' : ''}`}>
+      <button
+        className="sidebar-toggle"
+        onClick={() => setIsCollapsed(!isCollapsed)}
+        aria-label={isCollapsed ? 'Expand menu' : 'Collapse menu'}
+        title={isCollapsed ? 'Expand menu' : 'Collapse menu'}
+      >
+        <Menu size={20} />
+      </button>
 
       <nav className="sidebar-nav">
         {menuItems.map((item) => (
@@ -24,16 +27,12 @@ const Sidebar = ({ activeTab, setActiveTab, onLogout, user }) => {
             key={item.id}
             className={`nav-item ${activeTab === item.id ? 'active' : ''}`}
             onClick={() => setActiveTab(item.id)}
+            title={item.id.charAt(0).toUpperCase() + item.id.slice(1)}
           >
             <span className="icon">{item.icon}</span>
-            <span>{item.label}</span>
           </button>
         ))}
       </nav>
-
-      <button className="logout-btn" onClick={onLogout}>
-        Logout
-      </button>
     </aside>
   );
 };

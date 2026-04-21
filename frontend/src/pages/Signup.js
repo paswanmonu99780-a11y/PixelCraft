@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { getJson } from '../utils/api';
+import { Eye, EyeOff } from 'lucide-react';
 import '../styles/Auth.css';
 
 const Signup = () => {
@@ -13,6 +14,8 @@ const Signup = () => {
     code: '',
     referralCode: '',
   });
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [passwordStrength, setPasswordStrength] = useState('');
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
@@ -182,38 +185,58 @@ const Signup = () => {
                />
              </div>
 
-            <div className="form-group">
-              <label>Password</label>
-               <input
-                 type="password"
-                 name="password"
-                 value={formData.password}
-                 onChange={handleInputChange}
-                 required
-                 placeholder="Create a strong password"
-               />
-              {formData.password && (
-                <div className="password-strength">
-                  <div
-                    className="strength-bar"
-                    style={{ backgroundColor: getStrengthColor(), width: '100%' }}
-                  />
-                  <p style={{ color: getStrengthColor() }}>{passwordStrength}</p>
-                </div>
-              )}
-            </div>
+             <div className="form-group">
+               <label>Password</label>
+               <div className="password-input-wrapper">
+                 <input
+                   type={showPassword ? 'text' : 'password'}
+                   name="password"
+                   value={formData.password}
+                   onChange={handleInputChange}
+                   required
+                   placeholder="Create a strong password"
+                 />
+                 <button
+                   type="button"
+                   className="password-toggle"
+                   onClick={() => setShowPassword(!showPassword)}
+                   tabIndex={-1}
+                 >
+                   {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                 </button>
+               </div>
+               {formData.password && (
+                 <div className="password-strength">
+                   <div
+                     className="strength-bar"
+                     style={{ backgroundColor: getStrengthColor(), width: '100%' }}
+                   />
+                   <p style={{ color: getStrengthColor() }}>{passwordStrength}</p>
+                 </div>
+               )}
+             </div>
 
-            <div className="form-group">
-              <label>Confirm Password</label>
-              <input
-                type="password"
-                name="confirmPassword"
-                value={formData.confirmPassword}
-                onChange={handleInputChange}
-                required
-                placeholder="Confirm your password"
-              />
-            </div>
+             <div className="form-group">
+               <label>Confirm Password</label>
+               <div className="password-input-wrapper">
+                 <input
+                   type={showConfirmPassword ? 'text' : 'password'}
+                   name="confirmPassword"
+                   value={formData.confirmPassword}
+                   onChange={handleInputChange}
+                   required
+                   placeholder="Confirm your password"
+                 />
+                 <button
+                   type="button"
+                   className="password-toggle"
+                   onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                   tabIndex={-1}
+                 >
+                   {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                 </button>
+               </div>
+             </div>
 
             <button
               type="submit"
