@@ -37,6 +37,17 @@ function App() {
 function AppContent() {
   const { token } = useAuth();
 
+  // Simple test render first
+  return (
+    <div style={{ padding: '20px', fontSize: '24px', color: 'red' }}>
+      <h1>React App is Working!</h1>
+      <p>Token: {token ? 'Yes' : 'No'}</p>
+      <p>Loading status will show here</p>
+    </div>
+  );
+
+  // Original code commented out for testing
+  /*
   return (
     <>
       <Routes>
@@ -59,6 +70,7 @@ function AppContent() {
       {token && <AiAssistant />}
     </>
   );
+  */
 }
 
 export default App;

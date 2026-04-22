@@ -15,8 +15,7 @@ COPY backend ./backend
 COPY frontend ./frontend
 COPY data ./data
 
-# Build frontend inside Docker (with increased memory)
-RUN npm run build --prefix frontend
+# Frontend is pre-built, no need to build in Docker
 
 ENV NODE_ENV=production
 ENV PORT=7860

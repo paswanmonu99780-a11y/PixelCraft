@@ -9,6 +9,8 @@ const imageRoutes = require('./src/routes/image');
 const galleryRoutes = require('./src/routes/gallery');
 const userRoutes = require('./src/routes/user');
 const assistantRoutes = require('./src/routes/assistant');
+const paymentRoutes = require('./src/routes/paymentRoutes');
+
 const { setDatabaseReady, shouldUseMemoryStore } = require('./src/config/dbMode');
 
 const app = express();
@@ -65,6 +67,8 @@ app.use('/api/image', imageRoutes);
 app.use('/api/gallery', galleryRoutes);
 app.use('/api/user', userRoutes);
 app.use('/api/assistant', assistantRoutes);
+app.use('/api/payment', paymentRoutes);
+// app.use('/api/credits', creditsRoutes);
 
 // Health Check
 app.get('/api/health', (req, res) => {
@@ -98,9 +102,28 @@ app.use((err, req, res, next) => {
 });
 
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Server running on port ${PORT}`);
+
+process.on('uncaughtException', (error) => {
+  console.error('Uncaught Exception:', error);
+  process.exit(1);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+  process.exit(1);
+});
+
+console.log('Starting server...');
+console.log('PORT:', PORT);
+console.log('Environment:', process.env.NODE_ENV);
+
+const server = app.listen(PORT, '127.0.0.1', () => {
+  console.log(`✅ Server successfully started on port ${PORT}`);
+  console.log(`✅ Server address: ${server.address().address}:${server.address().port}`);
   if (shouldUseMemoryStore()) {
-    console.log('Running with in-memory data store');
+    console.log('ℹ️  Running with in-memory data store');
   }
+}).on('error', (error) => {
+  console.error('❌ Server failed to start:', error);
+  process.exit(1);
 });

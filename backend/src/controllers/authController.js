@@ -11,14 +11,13 @@ const memoryStore = require('../store/memoryStore');
 const otpStore = require('../store/otpStore');
 const { sendVerificationCode } = require('../utils/otpDelivery');
 const { serializeUser } = require('../utils/userSerializer');
-const {
-  DEFAULT_STARTING_TOKENS,
-  INVITE_REWARD,
-  addTokensToUser,
-  ensureUserTokenState,
-  generateReferralCode,
-  normalizeReferralCode,
-} = require('../utils/tokenUtils');
+const tokenUtils = require('../utils/tokenUtils');
+const DEFAULT_STARTING_CREDITS = tokenUtils.DEFAULT_STARTING_CREDITS;
+const INVITE_REWARD = 5; // Fixed value since not in tokenUtils
+const addCreditsToUser = tokenUtils.addCreditsToUser;
+const ensureUserCreditState = tokenUtils.ensureUserCreditState;
+const generateReferralCode = tokenUtils.generateReferralCode;
+const normalizeReferralCode = tokenUtils.normalizeReferralCode;
 
 const SIGNUP_CODE_PURPOSE = 'signup';
 const RESET_CODE_PURPOSE = 'password-reset';
@@ -201,7 +200,7 @@ exports.signup = async (req, res) => {
         username: normalizedUsername,
         ...buildContactFields(contact),
         password,
-        tokenBalance: DEFAULT_STARTING_TOKENS,
+        credits: DEFAULT_STARTING_CREDITS,
         referralCode: uniqueReferralCode,
         referredByUserId: referrer?._id || referrer?.id || '',
       });
@@ -215,7 +214,7 @@ exports.signup = async (req, res) => {
         username: normalizedUsername,
         ...buildContactFields(contact),
         password,
-        tokenBalance: DEFAULT_STARTING_TOKENS,
+credits: DEFAULT_STARTING_CREDITS,
         referralCode: uniqueReferralCode,
         referredByUserId: referrer?._id || null,
         rewardedLikePostIds: [],
@@ -227,12 +226,12 @@ exports.signup = async (req, res) => {
     }
 
     if (referrer) {
-      addTokensToUser(referrer, INVITE_REWARD, 'invite-referral', `New signup used referral code ${normalizedReferralCode}`);
+addCreditsToUser(referrer, INVITE_REWARD, 'invite-referral', `New signup used referral code ${normalizedReferralCode}`);
 
       if (shouldUseMemoryStore()) {
         await memoryStore.persistStore();
       } else {
-        ensureUserTokenState(referrer);
+ensureUserCreditState(referrer);
         await referrer.save();
       }
     }
@@ -244,9 +243,9 @@ exports.signup = async (req, res) => {
 
     const token = generateToken(user.id || user._id);
 
-    return res.status(201).json({
-      message: `User created successfully. ${DEFAULT_STARTING_TOKENS} signup tokens added.`,
-      token,
+return res.status(201).json({
+      message: `User created successfully. ${DEFAULT_STARTING_CREDITS} signup credits added.`,
+      token: token,
       user: serializeUser(user),
     });
   } catch (error) {

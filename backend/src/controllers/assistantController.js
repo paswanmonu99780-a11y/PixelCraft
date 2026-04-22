@@ -1,11 +1,8 @@
 const {
   ASSISTANT_NAME,
   createChatReply,
-  createRealtimeSession,
   getAssistantStatus,
   rememberUserMemory,
-  synthesizeSpeech,
-  transcribeAudio,
 } = require('../utils/assistantService');
 
 const buildPageContext = (body = {}, headers = {}) => {
@@ -40,8 +37,30 @@ exports.chat = async (req, res) => {
       return res.status(400).json({ error: 'A conversation with at least one message is required' });
     }
 
+    // Handle image upload
+    let processedMessages = messages;
+    if (req.file) {
+      // Convert uploaded image to base64 data URL
+      const imageBuffer = req.file.buffer;
+      const base64Image = imageBuffer.toString('base64');
+      const dataUrl = `data:${req.file.mimetype};base64,${base64Image}`;
+
+      // Add image to the last user message
+      const lastMessage = processedMessages[processedMessages.length - 1];
+      if (lastMessage && lastMessage.role === 'user') {
+        if (typeof lastMessage.content === 'string') {
+          lastMessage.content = [
+            { type: 'text', text: lastMessage.content },
+            { type: 'image_url', image_url: { url: dataUrl } }
+          ];
+        } else if (Array.isArray(lastMessage.content)) {
+          lastMessage.content.push({ type: 'image_url', image_url: { url: dataUrl } });
+        }
+      }
+    }
+
     const result = await createChatReply({
-      messages,
+      messages: processedMessages,
       pageContext: buildPageContext(req.body, req.headers),
       userId: req.userId,
       assistantClientId,
@@ -63,52 +82,6 @@ exports.chat = async (req, res) => {
   }
 };
 
-exports.createLiveSession = async (req, res) => {
-  try {
-    if (typeof req.body !== 'string' || !req.body.trim()) {
-      return res.status(400).json({ error: 'Session SDP payload is required' });
-    }
-
-    const pageContextHeader = req.headers['x-page-context'];
-    let pageContext = {};
-
-    if (pageContextHeader) {
-      try {
-        pageContext = JSON.parse(pageContextHeader);
-      } catch (error) {
-        pageContext = {};
-      }
-    }
-
-    const session = await createRealtimeSession({
-      sdp: req.body,
-      pageContext,
-      userId: req.userId,
-      assistantClientId: buildAssistantClientContext({}, req.headers).assistantClientId,
-    });
-
-    res.set('Content-Type', 'application/sdp');
-    return res.send(session.sdpAnswer);
-  } catch (error) {
-    console.error('Assistant live session error:', error);
-    return res.status(error.status || 500).json({
-      error: error.message || 'Live session could not be created',
-    });
-  }
-};
-
-exports.speak = async (req, res) => {
-  try {
-    const speech = await synthesizeSpeech(req.body?.text);
-    return res.json(speech);
-  } catch (error) {
-    console.error('Assistant speech error:', error);
-    return res.status(error.status || 500).json({
-      error: error.message || 'Speech generation failed',
-    });
-  }
-};
-
 exports.remember = async (req, res) => {
   try {
     const { assistantClientId } = buildAssistantClientContext(req.body, req.headers);
@@ -123,21 +96,6 @@ exports.remember = async (req, res) => {
     console.error('Assistant memory error:', error);
     return res.status(error.status || 500).json({
       error: error.message || 'Assistant memory could not be updated',
-    });
-  }
-};
-
-exports.transcribe = async (req, res) => {
-  try {
-    const transcription = await transcribeAudio({
-      base64Audio: req.body?.audio,
-      mimeType: req.body?.mimeType,
-    });
-    return res.json(transcription);
-  } catch (error) {
-    console.error('Assistant transcription error:', error);
-    return res.status(error.status || 500).json({
-      error: error.message || 'Audio transcription failed',
     });
   }
 };

@@ -1,0 +1,44 @@
+.ad-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 90px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.ad-container.home {
+  margin: 20px 0;
+}
+
+.ad-container.result {
+  margin: 20px auto;
+}
+
+.ad-container.sidebar {
+  position: sticky;
+  top: 20px;
+  margin: 20px 0;
+}
+
+.ad-container ins {
+  border: none !important;
+}
+
+.ad-label {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.4);
+  text-align: center;
+  margin-top: 5px;
+}
+
+@media (max-width: 768px) {
+  .ad-container {
+    min-height: 60px;
+  }
+  
+  .ad-container.sidebar {
+    display: none;
+  }
+}

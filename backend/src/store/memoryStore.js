@@ -4,13 +4,11 @@ const fs = require('fs');
 const path = require('path');
 const { normalizeId, normalizeIdList, serializeUser } = require('../utils/userSerializer');
 const { getContactFromIdentifier, normalizeEmail, normalizePhone } = require('../utils/validators');
-const {
-  DEFAULT_STARTING_TOKENS,
-  ensureUserTokenState,
-  normalizeReferralCode,
-} = require('../utils/tokenUtils');
+const tokenUtils = require('../utils/tokenUtils');
+const DEFAULT_STARTING_TOKENS = tokenUtils.DEFAULT_STARTING_CREDITS;
+const ensureUserCreditState = tokenUtils.ensureUserCreditState;
+const normalizeReferralCode = tokenUtils.normalizeReferralCode;
 
-// Use /data directory for persistent storage in production, local path for dev
 const isProduction = process.env.NODE_ENV === 'production';
 const STORE_FILE_PATH = isProduction
   ? path.join('/data', 'memory-store.json')
@@ -63,13 +61,13 @@ const loadStore = () => {
           followers: normalizeIdList(user.followers || user.followerUserIds),
           following: normalizeIdList(user.following || user.followingUserIds),
           tokenBalance: Number.isFinite(Number(user.tokenBalance)) ? Number(user.tokenBalance) : DEFAULT_STARTING_TOKENS,
-          referralCode: normalizeReferralCode(user.referralCode),
+    referralCode: tokenUtils.normalizeReferralCode(user.referralCode),
           referredByUserId: normalizeId(user.referredByUserId),
           rewardedLikePostIds: normalizeIdList(user.rewardedLikePostIds),
           rewardedFollowUserIds: normalizeIdList(user.rewardedFollowUserIds),
           tokenHistory: Array.isArray(user.tokenHistory) ? user.tokenHistory : [],
         }))
-          .map((user) => ensureUserTokenState(user))
+          .map((user) => ensureUserCreditState(user))
       : [];
     state.images = Array.isArray(parsedStore.images) ? parsedStore.images : [];
     state.galleryPosts = Array.isArray(parsedStore.galleryPosts)
@@ -104,7 +102,7 @@ loadStore();
 
 const sanitizeUser = (user) => {
   if (!user) return null;
-  ensureUserTokenState(user);
+  ensureUserCreditState(user);
   return serializeUser(user);
 };
 
@@ -171,7 +169,7 @@ const createUser = async ({
     createdAt: new Date().toISOString(),
   };
 
-  ensureUserTokenState(user);
+  ensureUserCreditState(user);
   state.users.push(user);
   saveStore();
   return sanitizeUser(user);
@@ -224,19 +222,19 @@ const findUserRecordByReferralCode = async (referralCode = '') => {
   const normalizedReferralCode = normalizeReferralCode(referralCode);
   if (!normalizedReferralCode) return null;
 
-  return ensureUserTokenState(
+  return ensureUserCreditState(
     state.users.find((entry) => entry.referralCode === normalizedReferralCode) || null
   );
 };
 
 const getUserRecordById = async (userId) =>
-  ensureUserTokenState(state.users.find((entry) => entry._id === userId) || null);
+  ensureUserCreditState(state.users.find((entry) => entry._id === userId) || null);
 
 const findUserRecordByIdentifier = async (identifier) => {
   const contact = getContactFromIdentifier(identifier);
   if (!contact) return null;
 
-  return ensureUserTokenState(state.users.find((entry) =>
+  return ensureUserCreditState(state.users.find((entry) =>
     contact.type === 'email'
       ? entry.email === contact.value
       : entry.phone === contact.value
@@ -552,3 +550,4 @@ module.exports = {
   updateUser,
   updateUserPassword,
 };
+

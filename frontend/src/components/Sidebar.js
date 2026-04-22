@@ -1,35 +1,31 @@
-import React, { useState } from 'react';
-import { Menu } from 'lucide-react';
+import React from 'react';
+import { 
+  Sparkles, 
+  Image, 
+  Clock, 
+} from 'lucide-react';
 import '../styles/Sidebar.css';
 
 const Sidebar = ({ activeTab, setActiveTab }) => {
-  const [isCollapsed, setIsCollapsed] = useState(false);
   const menuItems = [
-    { id: 'generate', icon: 'GEN' },
-    { id: 'history', icon: 'HIS' },
-    { id: 'community', icon: 'EXP' },
+    { id: 'generate', icon: Sparkles, label: 'Create' },
+    { id: 'explore', icon: Image, label: 'Explore' },
+    { id: 'history', icon: Clock, label: 'History' },
   ];
 
-  return (
-    <aside className={`sidebar ${isCollapsed ? 'collapsed' : ''}`}>
-      <button
-        className="sidebar-toggle"
-        onClick={() => setIsCollapsed(!isCollapsed)}
-        aria-label={isCollapsed ? 'Expand menu' : 'Collapse menu'}
-        title={isCollapsed ? 'Expand menu' : 'Collapse menu'}
-      >
-        <Menu size={20} />
-      </button>
 
+  return (
+    <aside className="sidebar glass-card">
       <nav className="sidebar-nav">
         {menuItems.map((item) => (
           <button
             key={item.id}
-            className={`nav-item ${activeTab === item.id ? 'active' : ''}`}
+            className={`nav-btn ${activeTab === item.id ? 'active glow-btn' : ''}`}
             onClick={() => setActiveTab(item.id)}
-            title={item.id.charAt(0).toUpperCase() + item.id.slice(1)}
+            title={item.label}
           >
-            <span className="icon">{item.icon}</span>
+            <item.icon size={24} />
+            <span>{item.label}</span>
           </button>
         ))}
       </nav>
@@ -38,3 +34,4 @@ const Sidebar = ({ activeTab, setActiveTab }) => {
 };
 
 export default Sidebar;
+

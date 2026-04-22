@@ -341,12 +341,40 @@
         "f3ec8913-7d6e-4ce7-a3c7-dad084154e30"
       ],
       "createdAt": "2026-04-18T02:23:40.477Z",
-      "tokenBalance": 42,
+      "tokenBalance": 22,
       "referralCode": "NCF0AE4CEC",
       "referredByUserId": "",
       "rewardedLikePostIds": [],
       "rewardedFollowUserIds": [],
       "tokenHistory": [
+        {
+          "amount": -5,
+          "type": "debit",
+          "reason": "generate-image",
+          "note": "Image generation cost",
+          "createdAt": "2026-04-21T02:06:15.616Z"
+        },
+        {
+          "amount": -5,
+          "type": "debit",
+          "reason": "generate-image",
+          "note": "Image generation cost",
+          "createdAt": "2026-04-21T01:50:33.766Z"
+        },
+        {
+          "amount": -5,
+          "type": "debit",
+          "reason": "generate-image",
+          "note": "Image generation cost",
+          "createdAt": "2026-04-21T01:36:01.607Z"
+        },
+        {
+          "amount": -5,
+          "type": "debit",
+          "reason": "generate-image",
+          "note": "Image generation cost",
+          "createdAt": "2026-04-21T01:35:52.199Z"
+        },
         {
           "amount": -1,
           "type": "debit",
@@ -1252,6 +1280,42 @@
       "ratio": "9:16",
       "quality": "high",
       "generatedAt": "2026-04-20T09:43:42.747Z"
+    },
+    {
+      "_id": "4ea13c28-8fd9-455f-84c6-1a574c0f2526",
+      "userId": "bc185a58-34f8-4988-a423-bb556b4151bc",
+      "prompt": "car",
+      "imageUrl": "http://localhost:5000/api/image/preview?source=https%3A%2F%2Fimage.pollinations.ai%2Fprompt%2Fcar%3Fwidth%3D768%26height%3D1024%26seed%3D1170199283%26nologo%3Dtrue",
+      "ratio": "9:16",
+      "quality": "high",
+      "generatedAt": "2026-04-21T01:35:52.214Z"
+    },
+    {
+      "_id": "9ab39909-f407-4723-9a31-0f7e8421f593",
+      "userId": "bc185a58-34f8-4988-a423-bb556b4151bc",
+      "prompt": "car",
+      "imageUrl": "http://localhost:5000/api/image/preview?source=https%3A%2F%2Fimage.pollinations.ai%2Fprompt%2Fcar%3Fwidth%3D768%26height%3D1024%26seed%3D82833524%26nologo%3Dtrue",
+      "ratio": "9:16",
+      "quality": "high",
+      "generatedAt": "2026-04-21T01:36:01.608Z"
+    },
+    {
+      "_id": "415f5b52-34be-4a99-a622-002f2f76eb5a",
+      "userId": "bc185a58-34f8-4988-a423-bb556b4151bc",
+      "prompt": "cat",
+      "imageUrl": "http://localhost:5000/api/image/preview?source=https%3A%2F%2Fimage.pollinations.ai%2Fprompt%2Fcat%3Fwidth%3D768%26height%3D1024%26seed%3D1309787723%26nologo%3Dtrue",
+      "ratio": "9:16",
+      "quality": "high",
+      "generatedAt": "2026-04-21T01:50:33.771Z"
+    },
+    {
+      "_id": "761267e3-4da4-4d17-8c3b-7c39215db4d5",
+      "userId": "bc185a58-34f8-4988-a423-bb556b4151bc",
+      "prompt": "firee",
+      "imageUrl": "http://localhost:5000/api/image/preview?source=https%3A%2F%2Fimage.pollinations.ai%2Fprompt%2Ffiree%3Fwidth%3D768%26height%3D1024%26seed%3D1714923100%26nologo%3Dtrue",
+      "ratio": "9:16",
+      "quality": "high",
+      "generatedAt": "2026-04-21T02:06:15.617Z"
     }
   ],
   "galleryPosts": [

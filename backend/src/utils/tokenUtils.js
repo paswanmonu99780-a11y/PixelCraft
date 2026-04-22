@@ -1,12 +1,9 @@
 const crypto = require('crypto');
 
-// Configurable token economics via environment variables
-const DEFAULT_STARTING_TOKENS = Number(process.env.DEFAULT_STARTING_TOKENS) || 50;
-const IMAGE_GENERATION_TOKEN_COST = Number(process.env.IMAGE_GENERATION_TOKEN_COST) || 5;
-const GALLERY_UPLOAD_REWARD = Number(process.env.GALLERY_UPLOAD_REWARD) || 10;
-const POST_LIKE_REWARD = Number(process.env.POST_LIKE_REWARD) || 3;
-const FOLLOW_REWARD = Number(process.env.FOLLOW_REWARD) || 15;
-const INVITE_REWARD = Number(process.env.INVITE_REWARD) || 70;
+// Configurable credit economics
+const DEFAULT_STARTING_CREDITS = Number(process.env.DEFAULT_STARTING_CREDITS) || 20;
+const IMAGE_GENERATION_CREDIT_COST = Number(process.env.IMAGE_GENERATION_CREDIT_COST) || 1;
+const DAILY_FREE_LIMIT = Number(process.env.DAILY_FREE_LIMIT) || 5;
 const TOKEN_HISTORY_LIMIT = Number(process.env.TOKEN_HISTORY_LIMIT) || 30;
 
 const normalizeStringList = (values = []) => (
@@ -15,19 +12,19 @@ const normalizeStringList = (values = []) => (
     : []
 );
 
-const normalizeTokenAmount = (value, fallback = DEFAULT_STARTING_TOKENS) => {
+const normalizeCreditAmount = (value, fallback = DEFAULT_STARTING_CREDITS) => {
   const numericValue = Number(value);
   return Number.isFinite(numericValue) ? numericValue : fallback;
 };
 
-const normalizeReferralCode = (value = '') =>
+const normalizeReferralCode = (value = '') => 
   String(value || '')
     .trim()
     .toUpperCase()
     .replace(/[^A-Z0-9]/g, '')
     .slice(0, 16);
 
-const buildTokenHistoryEntry = ({ amount = 0, reason = '', note = '' } = {}) => ({
+const buildCreditHistoryEntry = ({ amount = 0, reason = '', note = '' } = {}) => ({
   amount: Number(amount) || 0,
   type: Number(amount) >= 0 ? 'credit' : 'debit',
   reason: String(reason || '').trim() || 'manual',
@@ -35,17 +32,17 @@ const buildTokenHistoryEntry = ({ amount = 0, reason = '', note = '' } = {}) => 
   createdAt: new Date().toISOString(),
 });
 
-const ensureUserTokenState = (user = {}) => {
+const ensureUserCreditState = (user = {}) => {
   if (!user || typeof user !== 'object') {
     return user;
   }
 
-  user.tokenBalance = normalizeTokenAmount(user.tokenBalance);
+  user.credits = normalizeCreditAmount(user.credits);
   user.referralCode = normalizeReferralCode(user.referralCode);
   user.rewardedLikePostIds = normalizeStringList(user.rewardedLikePostIds);
   user.rewardedFollowUserIds = normalizeStringList(user.rewardedFollowUserIds);
-  user.tokenHistory = Array.isArray(user.tokenHistory)
-    ? user.tokenHistory
+  user.creditHistory = Array.isArray(user.creditHistory)
+    ? user.creditHistory
         .map((entry) => ({
           amount: Number(entry?.amount) || 0,
           type: entry?.type === 'debit' ? 'debit' : 'credit',
@@ -65,24 +62,24 @@ const ensureUserTokenState = (user = {}) => {
   return user;
 };
 
-const getUserTokenBalance = (user = {}) => ensureUserTokenState(user)?.tokenBalance ?? DEFAULT_STARTING_TOKENS;
+const getUserCreditBalance = (user = {}) => ensureUserCreditState(user)?.credits ?? DEFAULT_STARTING_CREDITS;
 
-const addTokenHistoryEntry = (user = {}, entry = {}) => {
-  ensureUserTokenState(user);
-  user.tokenHistory.unshift(buildTokenHistoryEntry(entry));
-  user.tokenHistory = user.tokenHistory.slice(0, TOKEN_HISTORY_LIMIT);
+const addCreditHistoryEntry = (user = {}, entry = {}) => {
+  ensureUserCreditState(user);
+  user.creditHistory.unshift(buildCreditHistoryEntry(entry));
+  user.creditHistory = user.creditHistory.slice(0, TOKEN_HISTORY_LIMIT);
 };
 
-const addTokensToUser = (user = {}, amount = 0, reason = '', note = '') => {
-  ensureUserTokenState(user);
+const addCreditsToUser = (user = {}, amount = 0, reason = '', note = '') => {
+  ensureUserCreditState(user);
   const normalizedAmount = Number(amount) || 0;
 
   if (!normalizedAmount) {
     return user;
   }
 
-  user.tokenBalance += normalizedAmount;
-  addTokenHistoryEntry(user, {
+  user.credits += normalizedAmount;
+  addCreditHistoryEntry(user, {
     amount: normalizedAmount,
     reason,
     note,
@@ -90,22 +87,22 @@ const addTokensToUser = (user = {}, amount = 0, reason = '', note = '') => {
   return user;
 };
 
-const spendTokensFromUser = (user = {}, amount = 0, reason = '', note = '') => {
-  ensureUserTokenState(user);
+const spendCreditsFromUser = (user = {}, amount = 0, reason = '', note = '') => {
+  ensureUserCreditState(user);
   const normalizedAmount = Math.abs(Number(amount) || 0);
 
   if (!normalizedAmount) {
     return user;
   }
 
-  if (user.tokenBalance < normalizedAmount) {
-    const error = new Error(`You need ${normalizedAmount} token${normalizedAmount === 1 ? '' : 's'} to continue`);
+  if (user.credits < normalizedAmount) {
+    const error = new Error(`You need ${normalizedAmount} credit${normalizedAmount === 1 ? '' : 's'} to continue`);
     error.status = 402;
     throw error;
   }
 
-  user.tokenBalance -= normalizedAmount;
-  addTokenHistoryEntry(user, {
+  user.credits -= normalizedAmount;
+  addCreditHistoryEntry(user, {
     amount: normalizedAmount * -1,
     reason,
     note,
@@ -114,13 +111,13 @@ const spendTokensFromUser = (user = {}, amount = 0, reason = '', note = '') => {
 };
 
 const hasRewardMarker = (user = {}, fieldName = '', value = '') => {
-  ensureUserTokenState(user);
+  ensureUserCreditState(user);
   const normalizedValue = String(value || '').trim();
   return Boolean(normalizedValue && normalizeStringList(user[fieldName]).includes(normalizedValue));
 };
 
 const addRewardMarker = (user = {}, fieldName = '', value = '') => {
-  ensureUserTokenState(user);
+  ensureUserCreditState(user);
   const normalizedValue = String(value || '').trim();
   if (!normalizedValue) {
     return user;
@@ -130,21 +127,20 @@ const addRewardMarker = (user = {}, fieldName = '', value = '') => {
   return user;
 };
 
-const generateReferralCode = () => normalizeReferralCode(`NC${crypto.randomBytes(4).toString('hex')}`);
+const generateReferralCode = () => normalizeReferralCode(`PC${crypto.randomBytes(4).toString('hex')}`);
 
 module.exports = {
-  DEFAULT_STARTING_TOKENS,
-  FOLLOW_REWARD,
-  GALLERY_UPLOAD_REWARD,
-  IMAGE_GENERATION_TOKEN_COST,
-  INVITE_REWARD,
-  POST_LIKE_REWARD,
-  addRewardMarker,
-  addTokensToUser,
-  ensureUserTokenState,
-  generateReferralCode,
-  getUserTokenBalance,
-  hasRewardMarker,
+  DEFAULT_STARTING_CREDITS,
+  IMAGE_GENERATION_CREDIT_COST,
+  DAILY_FREE_LIMIT,
+  TOKEN_HISTORY_LIMIT,
   normalizeReferralCode,
-  spendTokensFromUser,
+  addRewardMarker,
+  addCreditsToUser,
+  ensureUserCreditState,
+  generateReferralCode,
+  getUserCreditBalance,
+  hasRewardMarker,
+  spendCreditsFromUser,
 };
+

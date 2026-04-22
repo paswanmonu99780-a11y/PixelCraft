@@ -116,6 +116,7 @@ module.exports = {
   formatPhoneForSms,
   generateToken,
   getContactFromIdentifier,
+  getJwtSecret,
   getPasswordStrength,
   getSmsDefaultCountryCode,
   normalizeEmail,

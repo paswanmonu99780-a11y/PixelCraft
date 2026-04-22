@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Backend API Test</title>
+</head>
+<body>
+    <h1>Backend API Test Page</h1>
+    
+    <h2>Test Health Endpoint</h2>
+    <button onclick="testHealth()">Test Health</button>
+    <pre id="health-result"></pre>
+    
+    <h2>Test Image Generation</h2>
+    <input type="text" id="prompt" placeholder="Enter prompt" value="a beautiful sunset">
+    <button onclick="testImageGen()">Generate Image</button>
+    <pre id="image-result"></pre>
+    
+    <h2>Test Assistant Chat</h2>
+    <input type="text" id="message" placeholder="Enter message" value="Hello">
+    <button onclick="testChat()">Send Chat</button>
+    <pre id="chat-result"></pre>
+
+    <script>
+        async function testHealth() {
+            try {
+                const res = await fetch('http://localhost:5000/api/health');
+                const data = await res.json();
+                document.getElementById('health-result').textContent = JSON.stringify(data, null, 2);
+            } catch (e) {
+                document.getElementById('health-result').textContent = 'Error: ' + e.message;
+            }
+        }
+        
+        async function testImageGen() {
+            try {
+                const prompt = document.getElementById('prompt').value;
+                const res = await fetch('http://localhost:5000/api/image/generate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ prompt, ratio: '1:1', quality: 'balanced' })
+                });
+                const data = await res.json();
+                document.getElementById('image-result').textContent = JSON.stringify(data, null, 2);
+            } catch (e) {
+                document.getElementById('image-result').textContent = 'Error: ' + e.message;
+            }
+        }
+        
+        async function testChat() {
+            try {
+                const msg = document.getElementById('message').value;
+                const res = await fetch('http://localhost:5000/api/assistant/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        messages: [{ role: 'user', content: msg }],
+                        assistantClientId: 'test-' + Date.now()
+                    })
+                });
+                const data = await res.json();
+                document.getElementById('chat-result').textContent = JSON.stringify(data, null, 2);
+            } catch (e) {
+                document.getElementById('chat-result').textContent = 'Error: ' + e.message;
+            }
+        }
+    </script>
+</body>
+</html>

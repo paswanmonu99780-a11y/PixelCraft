@@ -1,6 +1,16 @@
 const axios = require('axios');
 const { randomInt } = require('crypto');
 
+let openaiClient = null;
+try {
+  const OpenAI = require('openai');
+  openaiClient = process.env.OPENAI_API_KEY ? new OpenAI({
+    apiKey: process.env.OPENAI_API_KEY,
+  }) : null;
+} catch (error) {
+  console.warn('OpenAI not available:', error.message);
+}
+
 const DEFAULT_MODEL = 'stabilityai/stable-diffusion-3-medium-diffusers';
 const DEFAULT_PROVIDER = 'hf-inference';
 const DEFAULT_RATIO = '1:1';
@@ -103,6 +113,40 @@ const generateImageWithHuggingFace = async (prompt, options = {}) => {
   return buildPollinationsUrl(prompt, generationOptions);
 };
 
+const generateImageWithOpenAI = async (prompt, options = {}) => {
+  if (!openaiClient) {
+    throw new Error('OpenAI client not available. Please check OPENAI_API_KEY environment variable.');
+  }
+
+  const generationOptions = normalizeGenerationOptions(options);
+
+  // Map aspect ratios to OpenAI supported sizes
+  const sizeMap = {
+    '1:1': '1024x1024',
+    '16:9': '1792x1024',
+    '9:16': '1024x1792',
+    '4:3': '1792x1344',
+    '3:4': '1344x1792'
+  };
+
+  const size = sizeMap[generationOptions.ratio] || '1024x1024';
+
+  try {
+    const response = await openaiClient.images.generate({
+      model: 'dall-e-3',
+      prompt: prompt,
+      size: size,
+      quality: generationOptions.quality === 'high' ? 'hd' : 'standard',
+      n: 1,
+    });
+
+    return response.data[0].url;
+  } catch (error) {
+    console.error('OpenAI image generation error:', error);
+    throw new Error(`OpenAI image generation failed: ${error.message}`);
+  }
+};
+
 module.exports = {
   ASPECT_RATIO_PRESETS,
   DEFAULT_QUALITY,
@@ -111,6 +155,7 @@ module.exports = {
   buildImagePreviewPath,
   fetchImageBuffer,
   generateImageWithHuggingFace,
+  generateImageWithOpenAI,
   isAllowedPreviewSource,
   normalizeGenerationOptions,
 };

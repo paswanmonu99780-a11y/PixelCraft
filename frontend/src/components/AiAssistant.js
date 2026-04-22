@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Mic, MicOff, Send, Volume2, VolumeX, Bot, X, Minimize2, Maximize2, Plus } from 'lucide-react';
+import { Mic, MicOff, Send, Volume2, VolumeX, Bot, X, Minimize2, Maximize2, Plus, Upload } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { apiUrl } from '../utils/api';
 import '../styles/AiHelpperWidget.css';
@@ -43,16 +43,51 @@ const isClearAssistantInput = (value = '', { source = 'text' } = {}) => {
 
 const AiAssistant = () => {
   const { token, user } = useAuth();
+
+  const renderMessageContent = (content) => {
+    if (typeof content === 'string') {
+      return content;
+    }
+
+    if (Array.isArray(content)) {
+      return content.map((item, index) => {
+        if (item.type === 'text') {
+          return <span key={index}>{item.text}</span>;
+        } else if (item.type === 'image_url' && item.image_url) {
+          return <img key={index} src={item.image_url.url} alt="User uploaded" style={{ maxWidth: '200px', maxHeight: '150px', borderRadius: '8px', margin: '8px 0' }} />;
+        }
+        return null;
+      });
+    }
+
+    return String(content);
+  };
   const [isOpen, setIsOpen] = useState(() => {
     return false;
   });
   const [isMinimized, setIsMinimized] = useState(() => {
-    const saved = localStorage.getItem('ai-assistant-minimized');
-    return saved !== null ? JSON.parse(saved) : false;
+    try {
+      const saved = localStorage.getItem('ai-assistant-minimized');
+      return saved !== null ? JSON.parse(saved) : false;
+    } catch (error) {
+      return false;
+    }
   });
   const [isFullscreen, setIsFullscreen] = useState(() => {
-    const saved = localStorage.getItem('ai-assistant-fullscreen');
-    return saved !== null ? JSON.parse(saved) : false;
+    try {
+      const saved = localStorage.getItem('ai-assistant-fullscreen');
+      return saved !== null ? JSON.parse(saved) : false;
+    } catch (error) {
+      return false;
+    }
+  });
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+    try {
+      const saved = localStorage.getItem('ai-assistant-dark-mode');
+      return saved !== null ? JSON.parse(saved) : true;
+    } catch (error) {
+      return true;
+    }
   });
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
@@ -63,7 +98,9 @@ const AiAssistant = () => {
   const [micLevel, setMicLevel] = useState(0);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isTyping, setIsTyping] = useState(false);
   const [isInCall, setIsInCall] = useState(false);
+  const [selectedImage, setSelectedImage] = useState(null);
 
   useEffect(() => {
     if (user?.username) {
@@ -91,7 +128,11 @@ const AiAssistant = () => {
   }, []);
 
   useEffect(() => {
-    localStorage.setItem('ai-assistant-open', JSON.stringify(isOpen));
+    try {
+      localStorage.setItem('ai-assistant-open', JSON.stringify(isOpen));
+    } catch (error) {
+      console.warn('Failed to save assistant open state:', error);
+    }
   }, [isOpen]);
 
   useEffect(() => {
@@ -101,12 +142,28 @@ const AiAssistant = () => {
   }, [user]);
 
   useEffect(() => {
-    localStorage.setItem('ai-assistant-minimized', JSON.stringify(isMinimized));
+    try {
+      localStorage.setItem('ai-assistant-minimized', JSON.stringify(isMinimized));
+    } catch (error) {
+      console.warn('Failed to save assistant minimized state:', error);
+    }
   }, [isMinimized]);
 
   useEffect(() => {
-    localStorage.setItem('ai-assistant-fullscreen', JSON.stringify(isFullscreen));
+    try {
+      localStorage.setItem('ai-assistant-fullscreen', JSON.stringify(isFullscreen));
+    } catch (error) {
+      console.warn('Failed to save assistant fullscreen state:', error);
+    }
   }, [isFullscreen]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('ai-assistant-dark-mode', JSON.stringify(isDarkMode));
+    } catch (error) {
+      console.warn('Failed to save assistant dark mode state:', error);
+    }
+  }, [isDarkMode]);
 
   // Update isInCall when speaking or listening changes
   useEffect(() => {
@@ -114,7 +171,11 @@ const AiAssistant = () => {
   }, [isSpeaking, isListening]);
 
   const appendAssistantMessage = (content) => {
-    setMessages(prev => [...prev, { id: `asst-${Date.now()}`, role: 'assistant', content }]);
+    setIsTyping(true);
+    setTimeout(() => {
+      setMessages(prev => [...prev, { id: `asst-${Date.now()}`, role: 'assistant', content }]);
+      setIsTyping(false);
+    }, 500 + Math.random() * 1000); // Simulate typing delay
   };
 
   const isDuplicateVoiceInput = (value) => {
@@ -155,25 +216,34 @@ const AiAssistant = () => {
       return;
     }
 
-    const userMessage = { id: `user-${Date.now()}`, role: 'user', content: text };
+    const userMessage = {
+      id: `user-${Date.now()}`,
+      role: 'user',
+      content: selectedImage ? [{ type: 'text', text }, { type: 'image_url', image_url: { url: URL.createObjectURL(selectedImage) } }] : text
+    };
     setMessages(prev => [...prev, userMessage]);
     setInput('');
+    setSelectedImage(null);
     setIsLoading(true);
     setError('');
 
     try {
+      const formData = new FormData();
+      formData.append('messages', JSON.stringify([{ role: 'user', content: text }]));
+      formData.append('context', 'general-chat');
+      formData.append('inputSource', source);
+      formData.append('assistantClientId', assistantClientIdRef.current);
+
+      if (selectedImage) {
+        formData.append('image', selectedImage);
+      }
+
       const response = await fetch(apiUrl('/api/assistant/chat'), {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        body: JSON.stringify({
-          messages: [{ role: 'user', content: text }],
-          context: 'general-chat',
-          inputSource: source,
-          assistantClientId: assistantClientIdRef.current,
-        }),
+        body: formData,
       });
 
       const data = await response.json().catch(() => ({}));
@@ -188,8 +258,7 @@ const AiAssistant = () => {
         throw new Error(data.error || 'AI response failed');
       }
     } catch (err) {
-      appendAssistantMessage('I am having trouble connecting right now. Please try again in a moment. You can also send a shorter version of your question and I will try again.');
-      setError(err.message);
+      appendAssistantMessage('Abhi thoda network problem hai. 1 minute baad phir try karo.');
     } finally {
       setIsLoading(false);
     }
@@ -324,6 +393,13 @@ const AiAssistant = () => {
     setIsFullscreen(!isFullscreen);
   };
 
+  const handleImageSelect = (event) => {
+    const file = event.target.files[0];
+    if (file && file.type.startsWith('image/')) {
+      setSelectedImage(file);
+    }
+  };
+
   const clearChat = () => {
     recognitionRef.current?.stop();
     recognitionRef.current = null;
@@ -331,6 +407,7 @@ const AiAssistant = () => {
     assistantClientIdRef.current = createAssistantSessionId();
     lastVoiceInputRef.current = { text: '', timestamp: 0 };
     setInput('');
+    setSelectedImage(null);
     setError('');
     setIsListening(false);
     setIsSpeaking(false);
@@ -352,13 +429,16 @@ const AiAssistant = () => {
   }
 
   return (
-    <div className={`ai-assistant-container ${isMinimized ? 'minimized' : ''} ${isFullscreen ? 'fullscreen' : ''}`}>
+    <div className={`ai-assistant-container ${isMinimized ? 'minimized' : ''} ${isFullscreen ? 'fullscreen' : ''} ${isDarkMode ? 'dark' : 'light'}`}>
       <div className="ai-assistant-header">
         <div className="ai-header-left">
           <Bot size={18} />
           <span>{currentUserName ? `${currentUserName}'s AI Assistant` : 'AI Assistant'}</span>
         </div>
         <div className="ai-header-actions">
+          <button onClick={() => setIsDarkMode(!isDarkMode)} className="theme-btn" title={isDarkMode ? 'Light mode' : 'Dark mode'}>
+            {isDarkMode ? '☀️' : '🌙'}
+          </button>
           <button onClick={clearChat} className="new-chat-btn" title="New chat">
             <Plus size={16} />
           </button>
@@ -403,16 +483,32 @@ const AiAssistant = () => {
           <div className="ai-messages">
             {messages.map((msg) => (
               <div key={msg.id} className={`ai-message ${msg.role}`}>
-                <div className="message-role">
-                  {msg.role === 'assistant' ? <Bot size={12} /> : 'You'}
+                <div className="message-avatar">
+                  {msg.role === 'assistant' ? <Bot size={16} /> : <div className="user-avatar">👤</div>}
                 </div>
-                <div className="message-content">{msg.content}</div>
+                <div className="message-bubble">
+                  <div className="message-content">{renderMessageContent(msg.content)}</div>
+                </div>
               </div>
             ))}
-            {isLoading && (
+            {isTyping && (
+              <div className="ai-message assistant typing">
+                <div className="message-avatar"><Bot size={16} /></div>
+                <div className="message-bubble">
+                  <div className="typing-indicator">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                  </div>
+                </div>
+              </div>
+            )}
+            {isLoading && !isTyping && (
               <div className="ai-message assistant loading">
-                <div className="message-role"><Bot size={12} /></div>
-                <div className="message-content">Thinking...</div>
+                <div className="message-avatar"><Bot size={16} /></div>
+                <div className="message-bubble">
+                  <div className="message-content">Thinking...</div>
+                </div>
               </div>
             )}
             <div ref={messagesEndRef} />
@@ -448,16 +544,33 @@ const AiAssistant = () => {
           </div>
 
           <form className="ai-input-form" onSubmit={(e) => { e.preventDefault(); handleSend(); }}>
-            <input
-              type="text"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder="Type or speak..."
-              disabled={isLoading}
-            />
-            <button type="submit" disabled={!input.trim() || isLoading}>
-              <Send size={16} />
-            </button>
+            {selectedImage && (
+              <div className="image-preview">
+                <img src={URL.createObjectURL(selectedImage)} alt="Selected" />
+                <button type="button" onClick={() => setSelectedImage(null)}>×</button>
+              </div>
+            )}
+            <div className="input-row">
+              <input
+                type="text"
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                placeholder="Type or speak..."
+                disabled={isLoading}
+              />
+              <label className="image-upload-btn">
+                <Upload size={16} />
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageSelect}
+                  style={{ display: 'none' }}
+                />
+              </label>
+              <button type="submit" disabled={(!input.trim() && !selectedImage) || isLoading}>
+                <Send size={16} />
+              </button>
+            </div>
           </form>
 
           {error && <div className="ai-error">{error}</div>}

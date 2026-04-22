@@ -76,11 +76,17 @@ def prepare_upload_dir() -> None:
     UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
     copy_tree(ROOT / "backend", UPLOAD_DIR / "backend")
     copy_tree(ROOT / "frontend", UPLOAD_DIR / "frontend")
-    # Remove pre-built frontend/build - Docker will build from source inside container
+    # Keep pre-built frontend/build - Docker will use it directly
     build_dir = UPLOAD_DIR / "frontend" / "build"
-    if build_dir.exists():
-        shutil.rmtree(build_dir)
-        print("  * Removed pre-built frontend/build (Docker builds)")
+    if not build_dir.exists():
+        print("  * Warning: frontend/build not found - building locally...")
+        # Build locally if missing
+        import subprocess
+        subprocess.run(["npm", "run", "build"], cwd=ROOT / "frontend", check=True)
+        copy_tree(ROOT / "frontend" / "build", UPLOAD_DIR / "frontend" / "build")
+        print("  * Built and included frontend/build")
+    else:
+        print("  * Included pre-built frontend/build")
     shutil.copy2(TEMPLATE_DIR / "Dockerfile", UPLOAD_DIR / "Dockerfile")
     shutil.copy2(TEMPLATE_DIR / "README.md", UPLOAD_DIR / "README.md")
 

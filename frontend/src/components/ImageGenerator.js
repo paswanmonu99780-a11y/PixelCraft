@@ -1,38 +1,29 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { apiUrl, getJson } from '../utils/api';
+import { apiUrl, getJson, checkGenerationLimit, fetchUserCreditsData } from '../utils/api';
 import { downloadAsset, resolveDownloadUrl } from '../utils/downloadAsset';
 import {
   ASSISTANT_ACTION_EVENT_NAME,
   clearPendingAssistantAction,
   readPendingAssistantAction,
 } from '../utils/assistantActions';
+import CreditsDisplay from './CreditsDisplay';
+import LoginModal from './LoginModal';
+import PaymentModal from './PaymentModal';
 import '../styles/ImageGenerator.css';
 
 const GENERATION_MODES = [
-  {
-    value: 'text-to-image',
-    label: 'Text to Image',
-    description: 'Create images from prompts.',
-  },
-  {
-    value: 'text-to-video',
-    label: 'Text to Video',
-    description: 'Turn prompts into short videos.',
-  },
-  {
-    value: 'image-to-video',
-    label: 'Image to Video',
-    description: 'Animate an uploaded image.',
-  },
+  { value: 'text-to-image', label: 'Image' },
+  { value: 'text-to-video', label: 'Video' },
+  { value: 'image-to-video', label: 'Animate' },
 ];
 
 const RATIO_OPTIONS = [
-  { value: '1:1', label: '1:1 Square' },
-  { value: '16:9', label: '16:9 Landscape' },
-  { value: '9:16', label: '9:16 Portrait' },
-  { value: '4:3', label: '4:3 Classic' },
-  { value: '3:4', label: '3:4 Portrait Classic' },
+  { value: '1:1', label: '1:1' },
+  { value: '16:9', label: '16:9' },
+  { value: '9:16', label: '9:16' },
+  { value: '4:3', label: '4:3' },
+  { value: '3:4', label: '3:4' },
 ];
 
 const QUALITY_OPTIONS = [
@@ -50,28 +41,17 @@ const readFileAsDataUrl = (file) =>
   new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(reader.result);
-    reader.onerror = () => reject(new Error('Could not load the selected image'));
+    reader.onerror = () => reject(new Error('Could not load image'));
     reader.readAsDataURL(file);
   });
 
-const findOptionLabel = (options, value) =>
-  options.find((option) => option.value === value)?.label || value;
-
-const findModeLabel = (mode) =>
-  GENERATION_MODES.find((option) => option.value === mode)?.label || mode;
-
-const isValidOption = (options, value) => options.some((option) => option.value === value);
-
 const getStoredSetting = (settingKey, fallbackValue, options) => {
-  if (typeof window === 'undefined') {
-    return fallbackValue;
-  }
-
+  if (typeof window === 'undefined') return fallbackValue;
   try {
     const storedSettings = JSON.parse(window.localStorage.getItem(SETTINGS_STORAGE_KEY) || '{}');
     const storedValue = storedSettings[settingKey];
-    return isValidOption(options, storedValue) ? storedValue : fallbackValue;
-  } catch (error) {
+    return options.some(o => o.value === storedValue) ? storedValue : fallbackValue;
+  } catch {
     return fallbackValue;
   }
 };
@@ -80,84 +60,42 @@ const isDataUrl = (assetUrl = '') => assetUrl.startsWith('data:');
 const isRemoteUrl = (assetUrl = '') => /^https?:\/\//i.test(assetUrl);
 const isProxyPreviewUrl = (assetUrl = '') => assetUrl.includes('/api/image/preview?');
 
-const getResolvedAssetUrl = (assetUrl = '') => {
-  if (!assetUrl || isDataUrl(assetUrl) || isRemoteUrl(assetUrl)) {
-    return assetUrl;
-  }
-
-  return apiUrl(assetUrl.startsWith('/') ? assetUrl : `/${assetUrl}`);
-};
-
 const getResolvedImageUrl = (imageUrl = '') => {
-  if (!imageUrl || isDataUrl(imageUrl)) {
-    return imageUrl;
-  }
-
-  if (isProxyPreviewUrl(imageUrl)) {
-    return isRemoteUrl(imageUrl) ? imageUrl : apiUrl(imageUrl);
-  }
-
-  if (isRemoteUrl(imageUrl)) {
-    return apiUrl(`/api/image/preview?source=${encodeURIComponent(imageUrl)}`);
-  }
-
+  if (!imageUrl || isDataUrl(imageUrl)) return imageUrl;
+  if (isProxyPreviewUrl(imageUrl)) return isRemoteUrl(imageUrl) ? imageUrl : apiUrl(imageUrl);
+  if (isRemoteUrl(imageUrl)) return apiUrl(`/api/image/preview?source=${encodeURIComponent(imageUrl)}`);
   return apiUrl(imageUrl.startsWith('/') ? imageUrl : `/${imageUrl}`);
 };
 
-const canRetryPreview = (imageUrl = '') => Boolean(imageUrl) && !isDataUrl(imageUrl);
-
 const getPreviewUrl = (imageUrl = '', retryCount = 0) => {
   const resolvedImageUrl = getResolvedImageUrl(imageUrl);
-
-  if (!resolvedImageUrl || isDataUrl(resolvedImageUrl)) {
-    return resolvedImageUrl;
-  }
-
+  if (!resolvedImageUrl || isDataUrl(resolvedImageUrl)) return resolvedImageUrl;
   try {
     const url = new URL(resolvedImageUrl, window.location.origin);
     url.searchParams.set('previewAttempt', String(retryCount));
     return url.toString();
-  } catch (error) {
+  } catch {
     const separator = resolvedImageUrl.includes('?') ? '&' : '?';
     return `${resolvedImageUrl}${separator}previewAttempt=${retryCount}`;
   }
 };
 
 const getFileExtension = (assetUrl = '', assetType = 'image') => {
-  if (assetType === 'video') {
-    if (assetUrl.includes('.webm') || assetUrl.includes('video/webm')) return 'webm';
-    if (assetUrl.includes('.mov') || assetUrl.includes('video/quicktime')) return 'mov';
-    if (assetUrl.includes('.m4v') || assetUrl.includes('video/x-m4v')) return 'm4v';
-    return 'mp4';
-  }
-
-  if (assetUrl.includes('image/svg+xml')) return 'svg';
-  if (assetUrl.includes('image/png')) return 'png';
-  if (assetUrl.includes('image/webp')) return 'webp';
-  return 'jpg';
+  if (assetType === 'video') return assetUrl.includes('.webm') ? 'webm' : 'mp4';
+  return assetUrl.includes('image/png') ? 'png' : 'jpg';
 };
 
-  const getPromptPlaceholder = (mode) => {
-    if (mode === 'text-to-video') {
-      return 'Describe the video you want to create... (e.g., neon cyberpunk street, camera motion)';
-    }
-
-    if (mode === 'image-to-video') {
-      return 'Optional: describe how the image should animate...';
-    }
-
-    return 'Describe the image you want to create... (e.g., futuristic city at sunset)';
-  };
+const getPromptPlaceholder = (mode) => {
+  if (mode === 'text-to-video') return 'Describe your video...';
+  if (mode === 'image-to-video') return 'Describe animation...';
+  return 'Describe your image...';
+};
 
 const getGenerateButtonLabel = (mode, loading) => {
-  if (loading) {
-    if (mode === 'text-to-image') return 'Generating Image...';
-    return 'Generating Video...';
-  }
-
+  if (loading) return mode === 'text-to-image' ? 'Generating...' : 'Processing...';
   if (mode === 'text-to-video') return 'Generate Video';
-  if (mode === 'image-to-video') return 'Animate Image';
-  return 'Generate Image';
+  if (mode === 'image-to-video') return 'Animate';
+  return 'Generate';
 };
 
 const ImageGenerator = () => {
@@ -176,44 +114,50 @@ const ImageGenerator = () => {
   const [videoStatusLoading, setVideoStatusLoading] = useState(false);
   const [publishMessage, setPublishMessage] = useState('');
   const [publishing, setPublishing] = useState(false);
+  const [showLoginModal, setShowLoginModal] = useState(false);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [userCreditsData, setUserCreditsData] = useState(null);
+  const [canGenerate, setCanGenerate] = useState(true);
   const { token, user, setUser } = useAuth();
   const previewRetryTimeoutRef = useRef(null);
   const lastAssistantActionIdRef = useRef('');
 
   useEffect(() => () => {
-    if (previewRetryTimeoutRef.current) {
-      window.clearTimeout(previewRetryTimeoutRef.current);
-    }
+    if (previewRetryTimeoutRef.current) window.clearTimeout(previewRetryTimeoutRef.current);
   }, []);
 
   useEffect(() => {
-    if (typeof window === 'undefined') {
-      return;
+    let interval;
+    if (token) {
+      const loadCreditsData = async () => {
+        try {
+          const data = await fetchUserCreditsData(token);
+          setUserCreditsData(data);
+          setCanGenerate(data.canGenerate !== false);
+        } catch (err) {
+          console.error('Credits check failed:', err);
+        }
+      };
+      loadCreditsData();
+      interval = setInterval(loadCreditsData, 30000);
     }
+    return () => clearInterval(interval);
+  }, [token]);
 
-    window.localStorage.setItem(
-      SETTINGS_STORAGE_KEY,
-      JSON.stringify({ ratio, quality })
-    );
+  useEffect(() => {
+    window.localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify({ ratio, quality }));
   }, [ratio, quality]);
 
   useEffect(() => {
-    if (previewRetryTimeoutRef.current) {
-      window.clearTimeout(previewRetryTimeoutRef.current);
-    }
-
+    if (previewRetryTimeoutRef.current) window.clearTimeout(previewRetryTimeoutRef.current);
     setPreviewRetryCount(0);
     setImgStatus(result?.assetType === 'image' ? 'loading' : 'idle');
   }, [result?.id, result?.assetType]);
 
   useEffect(() => {
     setError('');
-    setPublishMessage('');
     setResult(null);
-    setPublishing(false);
     setVideoStatus(null);
-    setVideoStatusLoading(false);
-
     if (mode !== 'image-to-video') {
       setSourceImage('');
       setSourceImageName('');
@@ -222,7 +166,6 @@ const ImageGenerator = () => {
 
   useEffect(() => {
     let isCancelled = false;
-
     if (mode === 'text-to-image' || !token) {
       setVideoStatus(null);
       setVideoStatusLoading(false);
@@ -231,52 +174,26 @@ const ImageGenerator = () => {
 
     const loadVideoStatus = async () => {
       setVideoStatusLoading(true);
-
       try {
-        const data = await getJson('/api/image/video-status', {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
-
-        if (!isCancelled) {
-          setVideoStatus(data.video || null);
-        }
-      } catch (err) {
-        if (!isCancelled) {
-          setVideoStatus({
-            canGenerate: true,
-            level: 'warning',
-            message: err.message || 'Could not load video setup details.',
-          });
-        }
+        const data = await getJson('/api/image/video-status', { headers: { Authorization: `Bearer ${token}` } });
+        if (!isCancelled) setVideoStatus(data.video || null);
+      } catch {
+        if (!isCancelled) setVideoStatus({ canGenerate: true });
       } finally {
-        if (!isCancelled) {
-          setVideoStatusLoading(false);
-        }
+        if (!isCancelled) setVideoStatusLoading(false);
       }
     };
 
     loadVideoStatus();
-
-    return () => {
-      isCancelled = true;
-    };
+    return () => { isCancelled = true; };
   }, [mode, token]);
 
   useEffect(() => {
-    if (typeof window === 'undefined') {
-      return undefined;
-    }
+    if (typeof window === 'undefined') return undefined;
 
     const applyAssistantAction = async (action) => {
-      if (!action?.id || action.id === lastAssistantActionIdRef.current) {
-        return;
-      }
-
-      if (action.type !== 'generate-image' && action.type !== 'generate-video') {
-        return;
-      }
+      if (!action?.id || action.id === lastAssistantActionIdRef.current) return;
+      if (action.type !== 'generate-image' && action.type !== 'generate-video') return;
 
       lastAssistantActionIdRef.current = action.id;
       const nextMode = action.type === 'generate-video' ? 'text-to-video' : 'text-to-image';
@@ -285,15 +202,9 @@ const ImageGenerator = () => {
       setMode(nextMode);
       setPrompt(nextPrompt);
       setError('');
-      setPublishMessage('');
 
-      if (action.ratio && isValidOption(RATIO_OPTIONS, action.ratio)) {
-        setRatio(action.ratio);
-      }
-
-      if (action.quality && isValidOption(QUALITY_OPTIONS, action.quality)) {
-        setQuality(action.quality);
-      }
+      if (action.ratio && RATIO_OPTIONS.some(o => o.value === action.ratio)) setRatio(action.ratio);
+      if (action.quality && QUALITY_OPTIONS.some(o => o.value === action.quality)) setQuality(action.quality);
 
       if (!action.autoRun || !nextPrompt) {
         clearPendingAssistantAction(action.id);
@@ -307,10 +218,7 @@ const ImageGenerator = () => {
         if (nextMode === 'text-to-video') {
           await generateTextToVideo(nextPrompt);
         } else {
-          await generateImage(nextPrompt, {
-            ratio: isValidOption(RATIO_OPTIONS, action.ratio) ? action.ratio : ratio,
-            quality: isValidOption(QUALITY_OPTIONS, action.quality) ? action.quality : quality,
-          });
+          await generateImage(nextPrompt, { ratio: action.ratio || ratio, quality: action.quality || quality });
         }
       } catch (err) {
         setError(err.message || 'Generation failed');
@@ -323,17 +231,10 @@ const ImageGenerator = () => {
     };
 
     void applyAssistantAction(readPendingAssistantAction());
-
-    const handleAssistantAction = (event) => {
-      void applyAssistantAction(event.detail);
-    };
-
+    const handleAssistantAction = (event) => void applyAssistantAction(event.detail);
     window.addEventListener(ASSISTANT_ACTION_EVENT_NAME, handleAssistantAction);
 
-    return () => {
-      window.removeEventListener(ASSISTANT_ACTION_EVENT_NAME, handleAssistantAction);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    return () => window.removeEventListener(ASSISTANT_ACTION_EVENT_NAME, handleAssistantAction);
   }, [quality, ratio, token]);
 
   const generateImage = async (promptText, options = { ratio, quality }) => {
@@ -350,13 +251,8 @@ const ImageGenerator = () => {
       }),
     });
 
-    if (!data?.image?.imageUrl) {
-      throw new Error('Image service returned an invalid response');
-    }
-
-    if (data.currentUser) {
-      setUser(data.currentUser);
-    }
+    if (!data?.image?.imageUrl) throw new Error('Invalid response');
+    if (data.currentUser) setUser(data.currentUser);
 
     setResult({
       id: data.image.id || Date.now(),
@@ -377,14 +273,10 @@ const ImageGenerator = () => {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify({
-        prompt: promptText,
-      }),
+      body: JSON.stringify({ prompt: promptText }),
     });
 
-    if (!data?.video?.videoUrl) {
-      throw new Error('Video service returned an invalid response');
-    }
+    if (!data?.video?.videoUrl) throw new Error('Invalid response');
 
     setResult({
       id: data.video.id || Date.now(),
@@ -403,15 +295,10 @@ const ImageGenerator = () => {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify({
-        prompt: promptText,
-        sourceImage: imageDataUrl,
-      }),
+      body: JSON.stringify({ prompt: promptText, sourceImage: imageDataUrl }),
     });
 
-    if (!data?.video?.videoUrl) {
-      throw new Error('Video service returned an invalid response');
-    }
+    if (!data?.video?.videoUrl) throw new Error('Invalid response');
 
     setResult({
       id: data.video.id || Date.now(),
@@ -425,55 +312,52 @@ const ImageGenerator = () => {
     });
   };
 
-  const runGenerationRequest = async ({
-    nextMode = mode,
-    promptText = prompt.trim(),
-    nextRatio = ratio,
-    nextQuality = quality,
-    imageDataUrl = sourceImage,
-    imageName = sourceImageName,
-    clearPromptAfter = true,
-  } = {}) => {
+  const runGenerationRequest = async () => {
     if (!token) {
-      setError('Session expired. Please log in again.');
+      setError('Session expired');
       return false;
     }
 
-    const trimmedPrompt = promptText.trim();
+    try {
+      const limitData = await checkGenerationLimit(token);
+      setCanGenerate(limitData.canGenerate);
+      if (!limitData.canGenerate) {
+        setError('Daily limit reached');
+        setShowPaymentModal(true);
+        return false;
+      }
+    } catch {
+      console.error('Limit check failed');
+    }
 
-    if (nextMode !== 'image-to-video' && !trimmedPrompt) {
-      setError('Please enter a prompt');
+    const trimmedPrompt = prompt.trim();
+    if (mode !== 'image-to-video' && !trimmedPrompt) {
+      setError('Enter a prompt');
       return false;
     }
 
-    if (nextMode === 'image-to-video' && !imageDataUrl) {
-      setError('Please upload a source image first');
+    if (mode === 'image-to-video' && !sourceImage) {
+      setError('Upload an image');
       return false;
     }
 
     setLoading(true);
     setError('');
-    setPublishMessage('');
-    setImgStatus(nextMode === 'text-to-image' ? 'loading' : 'idle');
+    setImgStatus(mode === 'text-to-image' ? 'loading' : 'idle');
 
     try {
-      if (nextMode === 'text-to-video') {
+      if (mode === 'text-to-video') {
         await generateTextToVideo(trimmedPrompt);
-      } else if (nextMode === 'image-to-video') {
-        await animateImage(trimmedPrompt, imageDataUrl, imageName);
+      } else if (mode === 'image-to-video') {
+        await animateImage(trimmedPrompt, sourceImage, sourceImageName);
       } else {
-        await generateImage(trimmedPrompt, {
-          ratio: nextRatio,
-          quality: nextQuality,
-        });
+        await generateImage(trimmedPrompt, { ratio, quality });
       }
 
-      if (clearPromptAfter && nextMode !== 'image-to-video') {
-        setPrompt('');
-      }
-
+      if (mode !== 'image-to-video') setPrompt('');
       return true;
     } catch (err) {
+      if (err.status === 429) setShowPaymentModal(true);
       setError(err.message || 'Generation failed');
       setImgStatus('error');
       return false;
@@ -490,18 +374,22 @@ const ImageGenerator = () => {
   const handleSourceImageChange = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
     try {
       const dataUrl = await readFileAsDataUrl(file);
       setSourceImage(dataUrl);
       setSourceImageName(file.name);
       setError('');
     } catch (err) {
-      setError(err.message || 'Could not load the selected image');
+      setError(err.message || 'Could not load image');
     }
   };
 
   const handleDownloadAsset = () => {
+    if (!token) {
+      setShowLoginModal(true);
+      setError('Please log in');
+      return;
+    }
     if (!result) return;
 
     downloadAsset({
@@ -515,42 +403,28 @@ const ImageGenerator = () => {
 
   const handleCopyLink = async () => {
     if (!result) return;
-
     try {
-      const resolvedUrl = result.assetType === 'image'
-        ? resolveDownloadUrl(result.assetUrl, 'image')
-        : resolveDownloadUrl(result.assetUrl, result.assetType);
+      const resolvedUrl = resolveDownloadUrl(result.assetUrl, result.assetType);
       await navigator.clipboard.writeText(resolvedUrl);
-      alert(`${result.assetType === 'image' ? 'Image' : 'Video'} link copied to clipboard!`);
-    } catch (err) {
-      setError(`Could not copy the ${result?.assetType || 'asset'} link`);
+    } catch {
+      setError('Could not copy link');
     }
   };
 
   const handleRegenerate = async () => {
     if (!result || !token) return;
-
     setLoading(true);
     setError('');
-    setPublishMessage('');
-
     try {
       if (result.generationMode === 'text-to-video') {
         await generateTextToVideo(result.prompt);
       } else if (result.generationMode === 'image-to-video') {
-        await animateImage(
-          result.prompt || '',
-          result.sourceImagePreview || sourceImage,
-          result.sourceImageName || sourceImageName
-        );
+        await animateImage(result.prompt || '', result.sourceImagePreview || sourceImage, result.sourceImageName || sourceImageName);
       } else {
-        await generateImage(result.prompt, {
-          ratio: result.ratio || ratio,
-          quality: result.quality || quality,
-        });
+        await generateImage(result.prompt, { ratio: result.ratio || ratio, quality: result.quality || quality });
       }
     } catch (err) {
-      setError(err.message || 'Could not regenerate the asset');
+      setError(err.message || 'Could not regenerate');
     } finally {
       setLoading(false);
     }
@@ -558,10 +432,8 @@ const ImageGenerator = () => {
 
   const handlePublishToExplore = async () => {
     if (!result || result.assetType !== 'image' || !token) return;
-
     setPublishing(true);
     setPublishMessage('');
-
     try {
       const data = await getJson('/api/gallery/posts', {
         method: 'POST',
@@ -571,20 +443,16 @@ const ImageGenerator = () => {
         },
         body: JSON.stringify({
           title: (result.prompt || 'Generated image').slice(0, 120),
-          description: result.prompt || '',
           prompt: result.prompt || '',
           imageUrl: result.assetUrl,
           source: 'generated',
         }),
       });
 
-      if (data.currentUser) {
-        setUser(data.currentUser);
-      }
-
-      setPublishMessage(data.message || 'Published to Explore!');
-    } catch (err) {
-      setPublishMessage(err.message || 'Could not publish image');
+      if (data.currentUser) setUser(data.currentUser);
+      setPublishMessage('Published!');
+    } catch {
+      setPublishMessage('Publish failed');
     } finally {
       setPublishing(false);
     }
@@ -592,268 +460,117 @@ const ImageGenerator = () => {
 
   const isTextToImageMode = mode === 'text-to-image';
   const isImageToVideoMode = mode === 'image-to-video';
-  const videoGenerationBlocked =
-    !isTextToImageMode && !videoStatusLoading && videoStatus?.canGenerate === false;
-  const videoStatusToneClass = videoStatusLoading
-    ? 'is-loading'
-    : videoStatus?.level === 'error'
-      ? 'is-error'
-      : videoStatus?.level === 'warning'
-        ? 'is-warning'
-        : 'is-ready';
+  const videoGenerationBlocked = !isTextToImageMode && !videoStatusLoading && videoStatus?.canGenerate === false;
 
   return (
     <div className="image-generator">
-      <div className="generator-form">
-        <div className="mode-selector" aria-label="Generation mode">
-          {GENERATION_MODES.map((modeOption) => (
-            <button
-              key={modeOption.value}
-              type="button"
-              className={`mode-card ${mode === modeOption.value ? 'active' : ''}`}
-              onClick={() => setMode(modeOption.value)}
-              aria-pressed={mode === modeOption.value}
-            >
-              <strong>{modeOption.label}</strong>
-              <span>{modeOption.description}</span>
-            </button>
-          ))}
-        </div>
-
-        <form onSubmit={handleGenerate}>
-          {isImageToVideoMode && (
-            <div className="source-upload-section">
-              <label className="source-upload-box">
-                <span>Upload Source Image</span>
-                <input type="file" accept="image/*" onChange={handleSourceImageChange} disabled={loading} />
-              </label>
-
-                {sourceImage && (
-                  <div className="source-preview">
-                    <img src={sourceImage} alt={sourceImageName || 'Source preview'} />
-                    <div>
-                      <strong>{sourceImageName || 'Source image selected'}</strong>
-                      <p>This will animate into a short video.</p>
-                    </div>
-                  </div>
-                )}
-            </div>
-          )}
-
-          <div className="input-group">
-            <textarea
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-              placeholder={getPromptPlaceholder(mode)}
-              maxLength={MAX_PROMPT_LENGTH}
-              rows={4}
-              disabled={loading}
-            />
-            <div className="char-count">
-              {prompt.length}/{MAX_PROMPT_LENGTH}
-            </div>
-          </div>
-
-          <p className="input-helper">
-            {isTextToImageMode
-              ? 'Enter a prompt to generate an image.'
-              : 'Video modes require HUGGING_FACE_VIDEO_API_KEY or PIAPI_API_KEY in backend/.env'}
-          </p>
-
-          {!isTextToImageMode && (
-            <div className={`video-status-banner ${videoStatusToneClass}`}>
-              <strong>{videoStatusLoading ? 'Checking setup...' : 'Video Setup'}</strong>
-              <span>
-                {videoStatusLoading
-                  ? 'Reading backend configuration...'
-                  : videoStatus?.message || 'Video configuration unavailable.'}
-              </span>
-            </div>
-          )}
-
-          {isTextToImageMode && (
-            <div className="generator-controls">
-              <div className="control-group">
-                <label htmlFor="ratio-select">Aspect Ratio</label>
-                <select
-                  id="ratio-select"
-                  value={ratio}
-                  onChange={(e) => setRatio(e.target.value)}
-                  disabled={loading}
-                >
-                  {RATIO_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="control-group">
-                <label htmlFor="quality-select">Quality</label>
-                <select
-                  id="quality-select"
-                  value={quality}
-                  onChange={(e) => setQuality(e.target.value)}
-                  disabled={loading}
-                >
-                  {QUALITY_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-          )}
-
-          {error && <div className="error-message">{error}</div>}
-
+      <div className="mode-tabs">
+        {GENERATION_MODES.map((modeOption) => (
           <button
-            type="submit"
-            className="generate-btn"
-            disabled={
-              loading ||
-              (!prompt.trim() && !isImageToVideoMode) ||
-              (isImageToVideoMode && !sourceImage) ||
-              videoGenerationBlocked
-            }
+            key={modeOption.value}
+            type="button"
+            className={`mode-tab ${mode === modeOption.value ? 'active' : ''}`}
+            onClick={() => setMode(modeOption.value)}
           >
-            {loading ? (
-              <>
-                <span className="spinner"></span> {getGenerateButtonLabel(mode, true)}
-              </>
-            ) : (
-              getGenerateButtonLabel(mode, false)
-            )}
+            {modeOption.label}
           </button>
-        </form>
+        ))}
       </div>
 
-      {loading && (
-        <div className="skeleton-loader">
-          <div className="skeleton-image"></div>
-        </div>
-      )}
+      <form onSubmit={handleGenerate} className="generator-form">
+        {isImageToVideoMode && (
+          <div className="upload-section">
+            <label className="upload-box">
+              <span>Upload Image</span>
+              <input type="file" accept="image/*" onChange={handleSourceImageChange} disabled={loading} />
+            </label>
+            {sourceImage && <img src={sourceImage} className="upload-preview" alt="Source" />}
+          </div>
+        )}
+
+        <textarea
+          value={prompt}
+          onChange={(e) => setPrompt(e.target.value)}
+          placeholder={getPromptPlaceholder(mode)}
+          maxLength={MAX_PROMPT_LENGTH}
+          rows={3}
+          disabled={loading}
+          className="prompt-input"
+        />
+
+        {isTextToImageMode && (
+          <div className="controls-row">
+            <div className="control-group">
+              <span>Aspect Ratio</span>
+              <div className="pill-group">
+                {RATIO_OPTIONS.map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    className={`pill ${ratio === option.value ? 'active' : ''}`}
+                    onClick={() => setRatio(option.value)}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="control-group">
+              <span>Quality</span>
+              <div className="pill-group">
+                {QUALITY_OPTIONS.map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    className={`pill ${quality === option.value ? 'active' : ''}`}
+                    onClick={() => setQuality(option.value)}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {error && <div className="error-text">{error}</div>}
+
+        <button
+          type="submit"
+          className="generate-button"
+          disabled={loading || !canGenerate || (!prompt.trim() && !isImageToVideoMode) || (isImageToVideoMode && !sourceImage) || videoGenerationBlocked}
+        >
+          {loading ? <span className="spinner"></span> : null}
+          {getGenerateButtonLabel(mode, loading)}
+        </button>
+      </form>
+
+      <LoginModal isOpen={showLoginModal} onClose={() => setShowLoginModal(false)} onLoginSuccess={setUser} />
+      <PaymentModal isOpen={showPaymentModal} onClose={() => setShowPaymentModal(false)} userToken={token} />
+
+      {loading && <div className="loader-container"><div className="loader"></div></div>}
 
       {result && !loading && (
-        <div className="image-preview">
+        <div className="result-card">
           {result.assetType === 'image' ? (
-            <>
-              <img
-                key={result.id}
-                src={getPreviewUrl(result.assetUrl, previewRetryCount)}
-                alt={result.prompt}
-                onLoad={() => {
-                  if (previewRetryTimeoutRef.current) {
-                    window.clearTimeout(previewRetryTimeoutRef.current);
-                  }
-                  setImgStatus('loaded');
-                }}
-                onError={() => {
-                  if (previewRetryTimeoutRef.current) {
-                    window.clearTimeout(previewRetryTimeoutRef.current);
-                  }
-
-                  if (canRetryPreview(result.assetUrl) && previewRetryCount < MAX_PREVIEW_RETRIES) {
-                    const nextRetryCount = previewRetryCount + 1;
-                    setImgStatus('loading');
-                    setError(`Preview is taking longer than usual. Retrying (${nextRetryCount}/${MAX_PREVIEW_RETRIES})...`);
-                    previewRetryTimeoutRef.current = window.setTimeout(() => {
-                      setPreviewRetryCount(nextRetryCount);
-                    }, PREVIEW_RETRY_DELAY_MS);
-                    return;
-                  }
-
-                  setImgStatus('error');
-                  setError('Generated image preview could not be loaded. Please try a shorter prompt or regenerate.');
-                }}
-                style={{ border: imgStatus === 'error' ? '2px solid red' : undefined }}
-              />
-              {imgStatus === 'loading' && (
-                <div className="prompt-label">Loading image preview...</div>
-              )}
-              {imgStatus === 'error' && (
-                <div className="error-message">
-                  Failed to load image preview.
-                </div>
-              )}
-            </>
+            <img src={getPreviewUrl(result.assetUrl, previewRetryCount)} alt={result.prompt} className="result-media" />
           ) : (
-            <video
-              key={result.id}
-              className="generated-video"
-              src={getResolvedAssetUrl(result.assetUrl)}
-              controls
-              playsInline
-            />
+            <video src={getResolvedImageUrl(result.assetUrl)} controls playsInline className="result-media" />
           )}
 
-           {result.generationMode === 'image-to-video' && result.sourceImagePreview && (
-             <div className="source-preview result-source-preview">
-               <img src={result.sourceImagePreview} alt={result.sourceImageName || 'Source image'} />
-               <div>
-                 <strong>{result.sourceImageName || 'Source image'}</strong>
-                 <p>Animated into video above.</p>
-               </div>
-             </div>
-           )}
-
-          <div className="image-info">
-            <div className="image-meta">
-              <span className="meta-pill">
-                {findModeLabel(result.generationMode)}
-              </span>
-              {result.assetType === 'image' && (
-                <>
-                  <span className="meta-pill">
-                    {findOptionLabel(RATIO_OPTIONS, result.ratio)}
-                  </span>
-                  <span className="meta-pill">
-                    {findOptionLabel(QUALITY_OPTIONS, result.quality)}
-                  </span>
-                </>
-              )}
-            </div>
-
-            {result.prompt ? (
-              <>
-                <p className="prompt-label">Prompt</p>
-                <p className="prompt-text">{result.prompt}</p>
-              </>
-            ) : (
-              <p className="generator-note">No prompt provided for this generation.</p>
+          <div className="result-actions">
+            <button onClick={handleDownloadAsset} className="action-button">Download</button>
+            <button onClick={handleCopyLink} className="action-button">Copy Link</button>
+            <button onClick={handleRegenerate} className="action-button">Regenerate</button>
+            {result.assetType === 'image' && (
+              <button onClick={handlePublishToExplore} className="action-button" disabled={publishing}>
+                {publishing ? 'Publishing...' : 'Publish'}
+              </button>
             )}
-
-            {result.assetType === 'video' && (
-              <p className="generator-note">
-                Download or share the video. Explore and history remain image-only.
-              </p>
-            )}
-
-            <div className="image-actions">
-              <button type="button" onClick={handleDownloadAsset} className="action-btn">
-                Download
-              </button>
-              <button type="button" onClick={handleCopyLink} className="action-btn">
-                Copy Link
-              </button>
-              <button type="button" onClick={handleRegenerate} className="action-btn">
-                Regenerate
-              </button>
-              {result.assetType === 'image' && (
-                <button
-                  type="button"
-                  onClick={handlePublishToExplore}
-                  className="action-btn"
-                  disabled={publishing}
-                >
-                  {publishing ? 'Publishing...' : 'Publish to Explore'}
-                </button>
-              )}
-            </div>
-            {publishMessage && <div className="success-message">{publishMessage}</div>}
           </div>
+
+          {publishMessage && <div className="success-text">{publishMessage}</div>}
         </div>
       )}
     </div>

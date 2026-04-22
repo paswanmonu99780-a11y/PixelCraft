@@ -1,123 +1,43 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const { normalizeEmail, normalizePhone, validateEmail, validatePhone } = require('../utils/validators');
-const { DEFAULT_STARTING_TOKENS, normalizeReferralCode } = require('../utils/tokenUtils');
+const tokenUtils = require('../utils/tokenUtils');
+const DEFAULT_STARTING_TOKENS = tokenUtils.DEFAULT_STARTING_CREDITS;
+const normalizeReferralCode = tokenUtils.normalizeReferralCode;
 
 const userSchema = new mongoose.Schema({
-  username: {
+  email: {
     type: String,
     required: true,
     unique: true,
     trim: true,
-    minlength: 3,
-  },
-  email: {
-    type: String,
-    unique: true,
-    sparse: true,
-    lowercase: true,
-    trim: true,
-    validate: {
-      validator: (value) => !value || validateEmail(value),
-      message: 'Please enter a valid email',
-    },
-  },
-  phone: {
-    type: String,
-    unique: true,
-    sparse: true,
-    trim: true,
-    validate: {
-      validator: (value) => !value || validatePhone(value),
-      message: 'Please enter a valid mobile number',
-    },
+    lowercase: true
   },
   password: {
     type: String,
     required: true,
-    minlength: 8,
+    minlength: 6
   },
-  avatarUrl: {
-    type: String,
-    default: '',
-  },
-  followers: {
-    type: [{
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'User',
-    }],
-    default: [],
-  },
-  following: {
-    type: [{
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'User',
-    }],
-    default: [],
-  },
-  tokenBalance: {
+  credits: {
     type: Number,
-    default: DEFAULT_STARTING_TOKENS,
-    min: 0,
+    default: 10 // New users get 10 free credits
   },
-  referralCode: {
-    type: String,
-    unique: true,
-    sparse: true,
-    trim: true,
-    uppercase: true,
+  dailyLimit: {
+    type: Number,
+    default: 5 // Free users: 5 images per day
   },
-  referredByUserId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    default: null,
+  usedToday: {
+    type: Number,
+    default: 0
   },
-  rewardedLikePostIds: {
-    type: [{
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'GalleryPost',
-    }],
-    default: [],
-  },
-  rewardedFollowUserIds: {
-    type: [{
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'User',
-    }],
-    default: [],
-  },
-  tokenHistory: {
-    type: [{
-      amount: {
-        type: Number,
-        required: true,
-      },
-      type: {
-        type: String,
-        enum: ['credit', 'debit'],
-        required: true,
-      },
-      reason: {
-        type: String,
-        required: true,
-        trim: true,
-      },
-      note: {
-        type: String,
-        default: '',
-        trim: true,
-      },
-      createdAt: {
-        type: Date,
-        default: Date.now,
-      },
-    }],
-    default: [],
-  },
-  createdAt: {
+  lastReset: {
     type: Date,
-    default: Date.now,
+    default: Date.now
   },
+  isPremium: {
+    type: Boolean,
+    default: false
+  }
 });
 
 userSchema.pre('validate', function (next) {

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import Landing from './pages/Landing';
@@ -11,6 +11,39 @@ import PublicProfile from './pages/PublicProfile';
 import AiAssistant from './components/AiAssistant';
 import AiVoiceAssistant from './components/AiVoiceAssistant';
 import './styles/App.css';
+
+const ThemeContext = createContext();
+
+export const ThemeProvider = ({ children }) => {
+  const [isDark, setIsDark] = useState(false);
+
+  useEffect(() => {
+    const saved = localStorage.getItem('theme');
+    if (saved === 'dark') {
+      setIsDark(true);
+      document.documentElement.classList.add('dark');
+    }
+  }, []);
+
+  const toggleTheme = () => {
+    const newTheme = !isDark;
+    setIsDark(newTheme);
+    localStorage.setItem('theme', newTheme ? 'dark' : 'light');
+    if (newTheme) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  };
+
+  return (
+    <ThemeContext.Provider value={{ isDark, toggleTheme }}>
+      {children}
+    </ThemeContext.Provider>
+  );
+};
+
+export const useTheme = () => useContext(ThemeContext);
 
 const routerBasename = process.env.PUBLIC_URL || '/';
 
@@ -27,15 +60,18 @@ const ProtectedRoute = ({ children }) => {
 function App() {
   return (
     <BrowserRouter basename={routerBasename}>
-      <AuthProvider>
-        <AppContent />
-      </AuthProvider>
+      <ThemeProvider>
+        <AuthProvider>
+          <AppContent />
+        </AuthProvider>
+      </ThemeProvider>
     </BrowserRouter>
   );
 }
 
 function AppContent() {
   const { token } = useAuth();
+  const { toggleTheme, isDark } = useTheme();
 
   return (
     <>
@@ -57,8 +93,16 @@ function AppContent() {
         <Route path="/voice-assistant" element={<AiVoiceAssistant />} />
       </Routes>
       {token && <AiAssistant />}
+      <button 
+        className="theme-toggle-btn"
+        onClick={toggleTheme}
+        title="Toggle dark mode"
+      >
+        {isDark ? '☀️' : '🌙'}
+      </button>
     </>
   );
 }
 
 export default App;
+
